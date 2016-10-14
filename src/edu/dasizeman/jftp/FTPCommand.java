@@ -1,4 +1,4 @@
-package edu.sizetron.jftp;
+package edu.dasizeman.jftp;
 
 public enum FTPCommand {
 	USER,

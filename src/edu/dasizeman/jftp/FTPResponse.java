@@ -1,4 +1,4 @@
-package edu.sizetron.jftp;
+package edu.dasizeman.jftp;
 
 import java.util.HashMap;
 import java.util.Map;

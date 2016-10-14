@@ -1,19 +1,26 @@
-package edu.sizetron.jftp;
+package edu.dasizeman.jftp;
 
 public class FTPShell extends Shell {
 	
 	private ProtocolManager manager;
+	
+	public FTPShell(String logPath) {
+		super(logPath);
+		manager = FTPClientManager.getInstance();
+	}
 	@Override
-	public void doCommand(String commandStr) throws Exception {
+	public void doCommand(String commandStr) throws Throwable {
 		try {
 		// TODO Call for a state transition from begin, with the command line
 			
 		// Wait for the state machine to get back to the begin state.
-		// TODO get the manager to catch network thread exceptions and set them
-			// while (!ready && checkException)
+		while(!manager.IsReady()) {
+			manager.CheckException();
+		}
 			
 		} catch (Exception e) { // TODO something out-of-protocol happened here, so we probably need to just reset everything and throw up
-			
+			manager.Reset();
+			throw e;
 		}
 		
 	}
@@ -28,6 +35,12 @@ public class FTPShell extends Shell {
 	protected String helpMessage() {
 		// TODO Write a message explaining available commands
 		return null;
+	}
+
+	@Override
+	protected void init() {
+		// TODO Auto-generated method stub
+		
 	}
 
 }
