@@ -10,16 +10,111 @@ public class FTPClientManager implements ProtocolManager {
 	
 	// The state diagrams that represent behavior of the DFA from a wait state 
 	// according to the FTP RFC
-	static private StateDiagram[] stateDiagrams;
+	static private Map<FTPCommand, StateDiagram> stateDiagrams;
+	static private Map<FTPCommand, FTPClientCommandHandler> FTPCmdMap;
+	static private Map<FTPInterfaceCommand, FTPClientCommandHandler> FTPInterfaceCmdMap;
 	static {
-		// TODO initialize each diagram here
+		// TODO initialize our maps
+		
+		// ABOR, ALLO, DELE, CWD, CDUP, SMNT, HELP, MODE, NOOP, PASV,
+		//QUIT, SITE, PORT, SYST, STAT, RMD, MKD, PWD, STRU, and TYPE.
+		// RFC 959 pp 54
+		StateDiagram diagramOne = new StateDiagram();
+				
+		// APPE, LIST, NLST, REIN, RETR, STOR, and STOU.
+		// RFC 959 pp 55 top
+		StateDiagram diagramTwo = new StateDiagram();
+		
+		// USER, PASS, ACCT
+		// RFC 959 pp 57
+		StateDiagram diagramThree = new StateDiagram();
+		
+		// Assign the appropriate transition states based on the first digit
+		// of the response code, for all diagrams
+		for (FTPResponse response: FTPResponse.values()) {
+			//1xx
+			if (response.code >= 100 && response.code < 200) {
+				// Map for all commands
+				// On D1, D3, all 1xx responses go to error state regardless of command
+				for (FTPCommand cmd : FTPCommand.values()) {
+					diagramOne.put(new FTPDiagramState(response, cmd), FTPState.ERROR);
+					diagramThree.put(new FTPDiagramState(response, cmd), FTPState.ERROR);
+				}
+				
+				// On D2, all 1xx responses go to wait, regardless of command
+				for (FTPCommand cmd : FTPCommand.values()) {
+					diagramTwo.put(new FTPDiagramState(response, cmd), FTPState.WAIT);
+				}
+				
+			}
+			
+			//2xx
+			// On all diagrams, all 2xx responses go to success regardless of command
+			if (response.code >= 200 && response.code < 300) {
+				for (FTPCommand cmd : FTPCommand.values()) {
+					diagramOne.put(new FTPDiagramState(response, cmd), FTPState.SUCCESS);
+					diagramTwo.put(new FTPDiagramState(response, cmd), FTPState.SUCCESS);
+					diagramThree.put(new FTPDiagramState(response, cmd), FTPState.SUCCESS);
+				}
+				
+			}
+			
+			//3xx
+			if (response.code >= 300 && response.code < 400) {
+				// On D1, D2, all 3xx responses go to error regardless of command
+				for (FTPCommand cmd : FTPCommand.values()) {
+					diagramOne.put(new FTPDiagramState(response, cmd), FTPState.ERROR);
+					diagramTwo.put(new FTPDiagramState(response, cmd), FTPState.ERROR);
+				}
+				
+				// On D3, the transition on a 3xx response is dependent on the current command
+				diagramThree.put(new FTPDiagramState(response, FTPCommand.USER), FTPState.BEGIN);
+				diagramThree.put(new FTPDiagramState(response, FTPCommand.PASS), FTPState.BEGIN);
+				
+				//...but we don't support the ACCT command right now
+				//diagramThree.put(new FTPDiagramState(response, FTPCommand.ACCT), FTPState.BEGIN);
+				
+				
+			}
+			
+			//On all diagrams, all 4xx, 5xx responses go to failure, regardless of command
+			if (response.code >= 400 && response.code < 600) {
+				for (FTPCommand cmd : FTPCommand.values()) {
+					diagramOne.put(new FTPDiagramState(response, cmd), FTPState.FAILURE);
+					diagramTwo.put(new FTPDiagramState(response, cmd), FTPState.FAILURE);
+					diagramThree.put(new FTPDiagramState(response, cmd), FTPState.FAILURE);
+				}
+				
+			}
+			
+		}
+		
+		// Now we map each command to a diagram
+		stateDiagrams = new HashMap<FTPCommand, StateDiagram>();
+		
+		// ABOR, ALLO, DELE, CWD, CDUP, SMNT, HELP, MODE, NOOP, PASV,
+		//QUIT, SITE, PORT, SYST, STAT, RMD, MKD, PWD, STRU, and TYPE.
+		stateDiagrams.put(FTPCommand.CWD, diagramOne);
+		stateDiagrams.put(FTPCommand.CDUP, diagramOne);
+		stateDiagrams.put(FTPCommand.HELP, diagramOne);
+		stateDiagrams.put(FTPCommand.PASV, diagramOne);
+		stateDiagrams.put(FTPCommand.QUIT, diagramOne);
+		stateDiagrams.put(FTPCommand.PORT, diagramOne);
+		stateDiagrams.put(FTPCommand.PWD, diagramOne);
+		
+		// APPE, LIST, NLST, REIN, RETR, STOR, and STOU.
+		stateDiagrams.put(FTPCommand.LIST, diagramTwo);
+		stateDiagrams.put(FTPCommand.RETR, diagramTwo);
+		
+		// USER, PASS, ACCT
+		stateDiagrams.put(FTPCommand.USER, diagramThree);
+		stateDiagrams.put(FTPCommand.PASS, diagramThree);
 	}
 	
 
+	private FTPDiagramState currentDiagramState;
 	private FTPState currentState;
 	private StateDiagram currentDiagram;
-	private Map<FTPCommand, FTPClientCommandHandler> FTPCmdMap;
-	private Map<FTPInterfaceCommand, FTPClientCommandHandler> FTPInterfaceCmdMap;
 	private FTPExceptionHandler exHandler;
 	private Throwable unhandledException;
 	private Logger logger;
@@ -35,6 +130,7 @@ public class FTPClientManager implements ProtocolManager {
 	}
 	
 	public FTPClientManager() {
+		this.currentDiagramState = new FTPDiagramState();
 		this.currentState = FTPState.BEGIN;
 		this.unhandledException = null;
 		this.exHandler = new FTPExceptionHandler();
@@ -85,21 +181,32 @@ public class FTPClientManager implements ProtocolManager {
 	private void parseAndExecuteCommand(String command) {
 		// TODO implement command parsing and handing off to the correct handler
 		// each handler must set the current state diagram appropriately
+		
+		//TODO set current diagram state's command section to this command so we can map
+		// state diagrams correctly
 	}
 
+	@Override
+	public void ControlDataReceived(String data) throws ProtocolException {
+		FTPResponse response = parseControlResponse(data);
+		Transition(response);
+		
+	}
 
-	// Our control connection thread will call back here
-	public void controlResponseReceived(String response) {
+	@Override
+	public void DataReceived(byte[] data) throws ProtocolException {
+		// TODO Auto-generated method stub
 		
 	}
 	
 	private FTPResponse parseControlResponse(String response) throws ProtocolException {
 		// TODO Parse to an FTPResponse
+		// Set the current diagram state's response
 		return null;
 	}
 
 	@Override
-	public void Transiton(Object data) throws ProtocolException {
+	public void Transition(Object data) throws ProtocolException {
 		try {
 			switch (this.currentState) {
 			case BEGIN:
@@ -108,6 +215,7 @@ public class FTPClientManager implements ProtocolManager {
 				this.currentState = FTPState.WAIT;
 				
 				// Parse and act on the command that will bring us to waiting state
+				parseAndExecuteCommand(commandString);
 				break;
 				
 			case WAIT:
@@ -126,9 +234,9 @@ public class FTPClientManager implements ProtocolManager {
 				break;
 			
 			case FAILURE:
-				ProtocolException ex = (ProtocolException)data;
+				ProtocolException e = (ProtocolException)data;
 				// Ruh roh.  Let's throw our exception so it will be picked up by the shell. 
-				throw ex;
+				throw e;
 			}
 		} catch (ClassCastException e) {
 			throw e;
@@ -146,6 +254,7 @@ public class FTPClientManager implements ProtocolManager {
 	@Override
 	public void Reset() {
 		this.currentState = FTPState.BEGIN;
+		this.currentDiagramState = new FTPDiagramState();
 	}
 	
 	
@@ -275,17 +384,6 @@ public class FTPClientManager implements ProtocolManager {
 		
 	}
 
-	@Override
-	public void ControlDataReceived(String data) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void DataReceived(byte[] data) {
-		// TODO Auto-generated method stub
-		
-	}
 	
 	
 

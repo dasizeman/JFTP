@@ -34,7 +34,7 @@ public enum FTPResponse {
 	ACCT_NEEDED_TO_STORE(532, "Need account for storing files.");
 	
 	public final int code;
-	public final String message;
+	public String message;
 	
 	FTPResponse(int code, String message) {
 		this.code = code;
