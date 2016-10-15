@@ -12,10 +12,12 @@ public class FTPShell extends Shell {
 	public void doCommand(String commandStr) throws Throwable {
 		try {
 		// TODO Call for a state transition from begin, with the command line
+			manager.Transition(commandStr);
 			
 		// Wait for the state machine to get back to the begin state.
-		while(!manager.IsReady()) {
+		while(!manager.IsReady()) { // totally spinlocking lol
 			manager.CheckException();
+			Thread.sleep(100);
 		}
 			
 		} catch (Exception e) { // TODO something out-of-protocol happened here, so we probably need to just reset everything and throw up

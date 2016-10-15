@@ -4,11 +4,11 @@ public interface ProtocolManager {
 	
 	public void Reset();
 	
-	public void Transition(Object data) throws ProtocolException; 
+	public void Transition(Object data) throws Exception; 
 	
-	public void ControlDataReceived(String data) throws ProtocolException;
+	public void ControlDataReceived(String data) throws Exception;
 	
-	public void DataReceived(byte[] data) throws ProtocolException;
+	public void DataReceived(byte[] data) throws Exception;
 	
 	public boolean IsReady();
 	

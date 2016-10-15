@@ -1,8 +1,10 @@
 package edu.dasizeman.jftp;
 
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class FTPClientManager implements ProtocolManager {
@@ -109,6 +111,24 @@ public class FTPClientManager implements ProtocolManager {
 		// USER, PASS, ACCT
 		stateDiagrams.put(FTPCommand.USER, diagramThree);
 		stateDiagrams.put(FTPCommand.PASS, diagramThree);
+		
+		// Use a dirty reflection trick to build our handler maps
+		FTPCmdMap = new HashMap<FTPCommand, FTPClientCommandHandler>();
+		FTPInterfaceCmdMap = new HashMap<FTPInterfaceCommand, FTPClientCommandHandler>();
+		// TODO do this
+		
+		for (FTPCommand cmd : FTPCommand.values()) {
+			String handlerClassName = FTPClientManager.class.getName() + "." + cmd.name() + "handler";
+			FTPClientCommandHandler handlerClass;
+			try {
+				handlerClass = (FTPClientCommandHandler)Class.forName(handlerClassName).newInstance();
+				FTPCmdMap.put(cmd,  handlerClass);
+			} catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		// TODO initiate a connection that can call back here
 	}
 	
 
@@ -137,12 +157,6 @@ public class FTPClientManager implements ProtocolManager {
 		this.exHandler.setFTPManager(this);
 		this.logger = Logger.getLogger(this.getClass().getName());
 		
-		// Use a dirty reflection trick to build our handler maps
-		FTPCmdMap = new HashMap<FTPCommand, FTPClientCommandHandler>();
-		FTPInterfaceCmdMap = new HashMap<FTPInterfaceCommand, FTPClientCommandHandler>();
-		// TODO do this
-		
-		// TODO initiate a connection that can call back here
 
 		
 	}
@@ -178,7 +192,23 @@ public class FTPClientManager implements ProtocolManager {
 	}
 	
 	
-	private void parseAndExecuteCommand(String command) {
+	private void parseAndExecuteCommand(String command) throws Exception {
+		String[] tokens = command.split(" ");
+		if (tokens.length < 1) {
+			throw new Exception("Command parsing got 0 tokens...what?");
+		}
+		
+		String baseCommandStr = tokens[0];
+		
+		if(!FTPClientManager.FTPInterfaceCmdMap.containsKey(baseCommandStr)) {
+			throw new Exception("Unsupported command: " + baseCommandStr);
+		}
+		
+		String[] cmdArgs = Arrays.copyOfRange(tokens, 1, tokens.length);
+		
+		FTPInterfaceCommand cmd = FTPInterfaceCommand.getByAlias(baseCommandStr);
+		FTPClientManager.FTPInterfaceCmdMap.get(cmd).handle(cmdArgs);
+
 		// TODO implement command parsing and handing off to the correct handler
 		// each handler must set the current state diagram appropriately
 		
@@ -187,14 +217,14 @@ public class FTPClientManager implements ProtocolManager {
 	}
 
 	@Override
-	public void ControlDataReceived(String data) throws ProtocolException {
+	public void ControlDataReceived(String data) throws Exception {
 		FTPResponse response = parseControlResponse(data);
 		Transition(response);
 		
 	}
 
 	@Override
-	public void DataReceived(byte[] data) throws ProtocolException {
+	public void DataReceived(byte[] data) throws Exception {
 		// TODO Auto-generated method stub
 		
 	}
@@ -204,9 +234,16 @@ public class FTPClientManager implements ProtocolManager {
 		// Set the current diagram state's response
 		return null;
 	}
+	
+	private void handleFTPResponse(FTPResponse response) {
+		// 
+		switch (response) {
+			
+		}
+	}
 
 	@Override
-	public void Transition(Object data) throws ProtocolException {
+	public void Transition(Object data) throws Exception {
 		try {
 			switch (this.currentState) {
 			case BEGIN:
@@ -216,6 +253,9 @@ public class FTPClientManager implements ProtocolManager {
 				
 				// Parse and act on the command that will bring us to waiting state
 				parseAndExecuteCommand(commandString);
+				
+				//TODO just for testing
+				this.currentState = FTPState.BEGIN;
 				break;
 				
 			case WAIT:
@@ -244,12 +284,6 @@ public class FTPClientManager implements ProtocolManager {
 		
 	}
 	
-	private void handleFTPResponse(FTPResponse response) {
-		// 
-		switch (response) {
-			
-		}
-	}
 	
 	@Override
 	public void Reset() {
@@ -259,17 +293,122 @@ public class FTPClientManager implements ProtocolManager {
 	
 	
 	
-	// Define the handlers for different FTP shell commands
 	
 	
 	public interface FTPClientCommandHandler {
-		public void handle(String command);
+		public void handle(String[] commandArgs);
 	}
 	
+	// Handlers for the shell/interface commands.  I chose to have this separate command
+	// layer so that the user interface could be more intuitive than just entering raw FTP commands.
+	public class LOGIN_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "LOGIN_CMD");
+			
+		}
+		
+	}
+	public class CD_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "CD_CMD");
+			
+		}
+		
+	}
+	public class CDUP_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "CDUP_CMD");
+			
+		}
+		
+	}
+	public class QUIT_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "QUIT_CMD");
+			
+		}
+		
+	}
+	public class PASV_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "PASV_CMD");
+			
+		}
+		
+	}
+	public class ACTV_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "ACTV_CMD");
+			
+		}
+		
+	}
+	public class GET_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "GET_CMD");
+			
+		}
+		
+	}
+	public class PWD_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "PWD_CMD");
+			
+		}
+		
+	}
+	public class LS_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "LS_CMD");
+			
+		}
+		
+	}
+	public class HELP_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "HELP_CMD");
+			
+		}
+		
+	}
+	
+	
+
+	// Actual protocol handlers
 	public class USERhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -278,7 +417,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class PASShandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -287,7 +426,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class CWDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -296,7 +435,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class CDUPhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -305,7 +444,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class QUIThandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -314,7 +453,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class PASVhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -323,7 +462,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class EPSVhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -332,7 +471,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class PORThandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -341,7 +480,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class EPRThandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -350,7 +489,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class RETRhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -359,7 +498,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class PWDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -368,7 +507,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class LISThandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
@@ -377,7 +516,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class HELPhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String command) {
+		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			
 		}
