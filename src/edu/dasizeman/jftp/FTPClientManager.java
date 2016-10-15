@@ -1,9 +1,12 @@
 package edu.dasizeman.jftp;
 
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -117,29 +120,6 @@ public class FTPClientManager implements ProtocolManager {
 		FTPInterfaceCmdMap = new HashMap<FTPInterfaceCommand, FTPClientCommandHandler>();
 		// TODO do this
 		
-		// Interface commands
-		for (FTPInterfaceCommand cmd : FTPInterfaceCommand.values()) {
-			String handlerClassName = FTPClientManager.class.getName() + "." + cmd.name() + "handler";
-			FTPClientCommandHandler handlerClass;
-			try {
-				handlerClass = (FTPClientCommandHandler)Class.forName(handlerClassName).newInstance();
-				FTPInterfaceCmdMap.put(cmd,  handlerClass);
-			} catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
-				e.printStackTrace();
-			}
-		}
-		
-		// Protocol commands
-		for (FTPCommand cmd : FTPCommand.values()) {
-			String handlerClassName = FTPClientManager.class.getName() + "." + cmd.name() + "handler";
-			FTPClientCommandHandler handlerClass;
-			try {
-				handlerClass = (FTPClientCommandHandler)Class.forName(handlerClassName).newInstance();
-				FTPCmdMap.put(cmd,  handlerClass);
-			} catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
-				e.printStackTrace();
-			}
-		}
 		
 		// TODO initiate a connection that can call back here
 	}
@@ -168,10 +148,46 @@ public class FTPClientManager implements ProtocolManager {
 		this.unhandledException = null;
 		this.exHandler = new FTPExceptionHandler();
 		this.exHandler.setFTPManager(this);
-		this.logger = Logger.getLogger(this.getClass().getName());
+		this.logger = Logger.getGlobal();
+		
+		
+		// Interface commands
+		for (FTPInterfaceCommand cmd : FTPInterfaceCommand.values()) {
+			FTPClientManager.FTPInterfaceCmdMap.put(cmd, getHandlerInstanceForCommand(cmd.name()));
+		}
+		
+		// Protocol commands
+		for (FTPCommand cmd : FTPCommand.values()) {
+			FTPClientManager.FTPCmdMap.put(cmd, getHandlerInstanceForCommand(cmd.name()));
+		}
 		
 
 		
+	}
+	
+	private FTPClientCommandHandler getHandlerInstanceForCommand(String commandName) {
+			// Build the name of the inner handler class
+			FTPClientCommandHandler handlerInstance = null;
+			try {
+			String handlerClassName = FTPClientManager.class.getName() + "$" + commandName + "handler";
+			
+			// Get a reference to its class object
+			Class<?> handlerClass = Class.forName(handlerClassName);
+			
+			// Now we have to get at its constructor
+			Constructor<?> handlerClassConstructor = handlerClass.getConstructor(new Class[]{this.getClass()});
+			
+			// And instantiate it
+			handlerInstance = (FTPClientCommandHandler)handlerClassConstructor.newInstance(new Object[]{this});
+
+			} catch (InstantiationException | IllegalAccessException | ClassNotFoundException 
+					| IllegalArgumentException | InvocationTargetException | NoSuchMethodException 
+					| SecurityException e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+			
+			return handlerInstance;
 	}
 	
 	private class FTPExceptionHandler implements UncaughtExceptionHandler {
@@ -213,8 +229,9 @@ public class FTPClientManager implements ProtocolManager {
 		
 		String baseCommandStr = tokens[0];
 		
-		if(!FTPClientManager.FTPInterfaceCmdMap.containsKey(baseCommandStr)) {
-			throw new Exception("Unsupported command: " + baseCommandStr);
+		if(FTPInterfaceCommand.getByAlias(baseCommandStr) == null) {
+			System.out.println("Unsupported command: " + baseCommandStr);
+			return;
 		}
 		
 		String[] cmdArgs = Arrays.copyOfRange(tokens, 1, tokens.length);
@@ -320,6 +337,9 @@ public class FTPClientManager implements ProtocolManager {
 		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			logger.log(Level.SEVERE, "CONNECT_CMD");
+			for (Handler handler : logger.getHandlers()) {
+				handler.flush();
+			}
 			
 		}
 		
@@ -419,7 +439,7 @@ public class FTPClientManager implements ProtocolManager {
 		@Override
 		public void handle(String[] command) {
 			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "SERVERHELP_CMD");
+			logger.log(Level.INFO, "SERVERHELP_CMD");
 			
 		}
 		
@@ -429,7 +449,7 @@ public class FTPClientManager implements ProtocolManager {
 		@Override
 		public void handle(String[] command) {
 			// TODO Auto-generated method stub
-			
+			System.out.println(FTPInterfaceCommand.GetHelpString());
 		}
 		
 	}
@@ -549,7 +569,6 @@ public class FTPClientManager implements ProtocolManager {
 
 		@Override
 		public void handle(String[] command) {
-			System.out.println(FTPInterfaceCommand.GetHelpString());
 			
 		}
 		

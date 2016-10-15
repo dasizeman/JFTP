@@ -2,35 +2,45 @@ package edu.dasizeman.jftp;
 
 import java.io.IOException;
 import java.util.Scanner;
-import java.util.logging.ConsoleHandler;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
+import java.util.logging.StreamHandler;
 
 public abstract class Shell {
 	
 	private Logger logger;
 	private FileHandler logFile;
-	private ConsoleHandler consoleLog;
-	private SimpleFormatter simpleFormatter;
+	private StreamHandler consoleLog;
+	private SimplerFormatter simpleFormatter;
 	
 	public Shell(String logPath) {
+		
+		LogManager.getLogManager().reset();
 		// Set up our logger
 		logger = Logger.getGlobal();
 		
 		try {
-			logFile = new FileHandler(logPath);
+			logFile = new FileHandler(logPath, true);
 		} catch (SecurityException | IOException e) {
 			System.out.println("Could not open log file.");
 			System.exit(1);
 		}
 		
-		consoleLog = new ConsoleHandler();
-		
-		simpleFormatter = new SimpleFormatter();
+		simpleFormatter = new SimplerFormatter();
+		consoleLog = new StreamHandler(System.out, simpleFormatter) {
+	        @Override
+	        public synchronized void publish(final LogRecord record) {
+	            super.publish(record);
+	            flush();
+	        }
+	    };
+		consoleLog.setLevel(Level.ALL);
 		logFile.setFormatter(simpleFormatter);
-		consoleLog.setFormatter(simpleFormatter);
+		logFile.setLevel(Level.ALL);
+		
 		
 		logger.addHandler(logFile);
 		logger.addHandler(consoleLog);
@@ -50,15 +60,25 @@ public abstract class Shell {
 
 		System.out.println(welcomeMessage());
 		System.out.println("Type 'help' for commands.");
-		while (inputString.toLowerCase() != "exit") {
+		do {
 			System.out.print(">");
-			inputString = inputScanner.nextLine(); 
-			
+			inputString = inputScanner.nextLine().toLowerCase(); 
+			if (inputString.equals("")) {
+				continue;
+			}
+
 			try {
 				doCommand(inputString);
 			} catch (Throwable e) {
-				System.out.println(e.getMessage());
+				logger.log(Level.SEVERE, e.getMessage());
 			}
+		}while (!inputString.equals("quit"));
+		
+		// Hook the underlying shell to do exit stuff
+		try {
+			doCommand("quit");
+		} catch (Throwable e) {
+			logger.log(Level.SEVERE, e.getMessage());
 		}
 		
 		inputScanner.close();

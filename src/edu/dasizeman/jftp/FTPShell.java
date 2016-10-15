@@ -29,8 +29,7 @@ public class FTPShell extends Shell {
 
 	@Override
 	protected String welcomeMessage() {
-		// TODO Write a welcome message
-		return null;
+		return "Welcome to JFTP";
 	}
 
 	@Override
