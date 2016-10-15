@@ -34,12 +34,6 @@ public class FTPShell extends Shell {
 	}
 
 	@Override
-	protected String helpMessage() {
-		// TODO Write a message explaining available commands
-		return null;
-	}
-
-	@Override
 	protected void init() {
 		// TODO Auto-generated method stub
 		

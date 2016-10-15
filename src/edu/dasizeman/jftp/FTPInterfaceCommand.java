@@ -4,16 +4,19 @@ import java.util.HashMap;
 import java.util.Map;
 
 public enum FTPInterfaceCommand {
+	CONNECT_CMD("connect", " <hostname>:<port> : connect to the specified server.  Default port is 21.\n"),
 	LOGIN_CMD("login", " -u <username> -p <password> : Log in to the server.\n"),
 	CD_CMD("cd", " <path> : Change directory.\n"),
 	CDUP_CMD("cdup", " : go up a directory.\n"),
 	QUIT_CMD("quit", " : exit JFTP.\n"),
 	PASV_CMD("passive", " -p <port> : enter passive mode with selected data port.\n"),
-	ACTV_CMD("active"),
-	GET_CMD("get"),
-	PWD_CMD("pwd"),
-	LS_CMD("ls"),
-	HELP_CMD("help");
+	ACTV_CMD("active", "-p <port> : enter active mode with selected data port.\n"),
+	GET_CMD("get", " <filename> : download the selected file.\n"),
+	PWD_CMD("pwd", " : print the current server directory.\n"),
+	LS_CMD("ls", " : list the contents of the current server directory.\n"),
+	SERVERHELP_CMD("serverhelp", " : show the server's help message.\n"),
+	HELP_CMD("help", " : show this message.\n");
+	
 	
 	private final String alias, helpString;
 	
@@ -33,6 +36,17 @@ public enum FTPInterfaceCommand {
 	
 	public static FTPInterfaceCommand getByAlias(String alias) {
 		return commandMap.get(alias);
+	}
+	
+	public static String GetHelpString() {
+		String result = "";
+		
+		for (FTPInterfaceCommand cmd : FTPInterfaceCommand.values()) {
+			result += cmd.alias + cmd.helpString;
+		}
+		
+		return result;
+		
 	}
 	
 	

@@ -44,8 +44,6 @@ public abstract class Shell {
 	
 	protected abstract String welcomeMessage();
 	
-	protected abstract String helpMessage();
-	
 	public void run() {
 		Scanner inputScanner = new Scanner(System.in);
 		String inputString = "";

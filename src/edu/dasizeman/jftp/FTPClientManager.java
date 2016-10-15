@@ -117,6 +117,19 @@ public class FTPClientManager implements ProtocolManager {
 		FTPInterfaceCmdMap = new HashMap<FTPInterfaceCommand, FTPClientCommandHandler>();
 		// TODO do this
 		
+		// Interface commands
+		for (FTPInterfaceCommand cmd : FTPInterfaceCommand.values()) {
+			String handlerClassName = FTPClientManager.class.getName() + "." + cmd.name() + "handler";
+			FTPClientCommandHandler handlerClass;
+			try {
+				handlerClass = (FTPClientCommandHandler)Class.forName(handlerClassName).newInstance();
+				FTPInterfaceCmdMap.put(cmd,  handlerClass);
+			} catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		// Protocol commands
 		for (FTPCommand cmd : FTPCommand.values()) {
 			String handlerClassName = FTPClientManager.class.getName() + "." + cmd.name() + "handler";
 			FTPClientCommandHandler handlerClass;
@@ -301,6 +314,16 @@ public class FTPClientManager implements ProtocolManager {
 	
 	// Handlers for the shell/interface commands.  I chose to have this separate command
 	// layer so that the user interface could be more intuitive than just entering raw FTP commands.
+	public class CONNECT_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "CONNECT_CMD");
+			
+		}
+		
+	}
 	public class LOGIN_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
@@ -391,12 +414,21 @@ public class FTPClientManager implements ProtocolManager {
 		}
 		
 	}
+	public class SERVERHELP_CMDhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] command) {
+			// TODO Auto-generated method stub
+			logger.log(Level.SEVERE, "SERVERHELP_CMD");
+			
+		}
+		
+	}
 	public class HELP_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
 		public void handle(String[] command) {
 			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "HELP_CMD");
 			
 		}
 		
@@ -517,14 +549,11 @@ public class FTPClientManager implements ProtocolManager {
 
 		@Override
 		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+			System.out.println(FTPInterfaceCommand.GetHelpString());
 			
 		}
 		
 	}
-
-	
-	
 
 }
 
