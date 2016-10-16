@@ -6,9 +6,9 @@ public interface ProtocolManager {
 	
 	public void Transition(Object data) throws Exception; 
 	
-	public void ControlDataReceived(String data) throws Exception;
+	public void ControlDataReceived(String data);
 	
-	public void DataReceived(byte[] data) throws Exception;
+	public void DataReceived(byte[] data);
 	
 	public boolean IsReady();
 	

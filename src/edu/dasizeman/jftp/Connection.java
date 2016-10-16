@@ -5,27 +5,28 @@ import java.io.OutputStream;
 import java.net.Socket;
 
 public class Connection {
-	private Socket socket;
-	private InputStream socketInputStream;
-	private OutputStream socketOutputStream;
-	private String host;
-	private int port;
+	protected Socket socket;
+	protected InputStream socketInputStream;
+	protected OutputStream socketOutputStream;
+	protected String host;
+	protected int port;
 	
 	public Connection(String host) throws Exception {
-		this.connect(host);
-	}
-	
-	private void connect(String host) throws Exception {
 		if (!parseHostString(host)) {
 			throw new Exception("Could not parse connection host: " + host);
 		}
+		Connect();
+	}
+	
+	protected void Connect() throws Exception {
 		
 		this.socket = new Socket(this.host, this.port);
 		this.socketInputStream = this.socket.getInputStream();
 		this.socketOutputStream = this.socket.getOutputStream();
 	}
 	
-	private boolean parseHostString(String str) {
+	// TODO make this a utility, don't modify members directly
+	protected boolean parseHostString(String str) {
 		if (!str.contains(":")) {
 			return false;
 		}
@@ -48,7 +49,7 @@ public class Connection {
 	public OutputStream getOutputStream() {
 		return this.socketOutputStream;
 	}
-	
+
 	public void close() throws Exception {
 		this.socket.close();
 	}

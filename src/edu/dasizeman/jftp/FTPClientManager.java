@@ -6,12 +6,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class FTPClientManager implements ProtocolManager {
+	public static final String CRLF = "\r\n";
 	static private FTPClientManager instance;
+	private static Logger logger;
 	
 	// The state diagrams that represent behavior of the DFA from a wait state 
 	// according to the FTP RFC
@@ -19,7 +20,7 @@ public class FTPClientManager implements ProtocolManager {
 	static private Map<FTPCommand, FTPClientCommandHandler> FTPCmdMap;
 	static private Map<FTPInterfaceCommand, FTPClientCommandHandler> FTPInterfaceCmdMap;
 	static {
-		// TODO initialize our maps
+		logger = Logger.getGlobal();
 		
 		// ABOR, ALLO, DELE, CWD, CDUP, SMNT, HELP, MODE, NOOP, PASV,
 		//QUIT, SITE, PORT, SYST, STAT, RMD, MKD, PWD, STRU, and TYPE.
@@ -130,7 +131,7 @@ public class FTPClientManager implements ProtocolManager {
 	private StateDiagram currentDiagram;
 	private FTPExceptionHandler exHandler;
 	private Throwable unhandledException;
-	private Logger logger;
+	private String currentHost;
 
 	
 	
@@ -148,7 +149,6 @@ public class FTPClientManager implements ProtocolManager {
 		this.unhandledException = null;
 		this.exHandler = new FTPExceptionHandler();
 		this.exHandler.setFTPManager(this);
-		this.logger = Logger.getGlobal();
 		
 		
 		// Interface commands
@@ -247,14 +247,18 @@ public class FTPClientManager implements ProtocolManager {
 	}
 
 	@Override
-	public void ControlDataReceived(String data) throws Exception {
-		FTPResponse response = parseControlResponse(data);
-		Transition(response);
-		
+	public void ControlDataReceived(String data) {
+		FTPResponse response;
+		try {
+			response = parseControlResponse(data);
+			Transition(response);
+		} catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
 	}
 
 	@Override
-	public void DataReceived(byte[] data) throws Exception {
+	public void DataReceived(byte[] data) {
 		// TODO Auto-generated method stub
 		
 	}
@@ -262,6 +266,7 @@ public class FTPClientManager implements ProtocolManager {
 	private FTPResponse parseControlResponse(String response) throws ProtocolException {
 		// TODO Parse to an FTPResponse
 		// Set the current diagram state's response
+		
 		return null;
 	}
 	
@@ -271,6 +276,7 @@ public class FTPClientManager implements ProtocolManager {
 			
 		}
 	}
+	
 
 	@Override
 	public void Transition(Object data) throws Exception {
@@ -326,7 +332,11 @@ public class FTPClientManager implements ProtocolManager {
 	
 	
 	public interface FTPClientCommandHandler {
-		public void handle(String[] commandArgs);
+		public void handle(String[] commandArgs) throws Exception;
+	}
+
+	private void sendControlMessage(String message) throws Exception {
+		FTPControlConnection.getInstance(this.currentHost).SendCommand(message+CRLF);
 	}
 	
 	// Handlers for the shell/interface commands.  I chose to have this separate command
@@ -334,13 +344,15 @@ public class FTPClientManager implements ProtocolManager {
 	public class CONNECT_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "CONNECT_CMD");
-			for (Handler handler : logger.getHandlers()) {
-				handler.flush();
-			}
+		public void handle(String[] command) throws Exception {
+			// TODO For now we will send a NO-OP command as the first message
 			
+			// Argument must be the <hostname>:<port> string
+			if(command.length < 1) {
+				throw new Exception("connect: no host provided");
+			}
+			currentHost = command[0];
+			sendControlMessage("NOOP");
 		}
 		
 	}
