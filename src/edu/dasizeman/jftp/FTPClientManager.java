@@ -101,6 +101,7 @@ public class FTPClientManager implements ProtocolManager {
 		// Now we map each command to a diagram
 		stateDiagrams = new HashMap<FTPCommand, StateDiagram>();
 		
+		// TODO Add EPRT and EPSV
 		// ABOR, ALLO, DELE, CWD, CDUP, SMNT, HELP, MODE, NOOP, PASV,
 		//QUIT, SITE, PORT, SYST, STAT, RMD, MKD, PWD, STRU, and TYPE.
 		stateDiagrams.put(FTPCommand.CWD, diagramOne);
@@ -110,6 +111,7 @@ public class FTPClientManager implements ProtocolManager {
 		stateDiagrams.put(FTPCommand.QUIT, diagramOne);
 		stateDiagrams.put(FTPCommand.PORT, diagramOne);
 		stateDiagrams.put(FTPCommand.PWD, diagramOne);
+		stateDiagrams.put(FTPCommand.NOOP, diagramOne);
 		
 		// APPE, LIST, NLST, REIN, RETR, STOR, and STOU.
 		stateDiagrams.put(FTPCommand.LIST, diagramTwo);
@@ -144,6 +146,7 @@ public class FTPClientManager implements ProtocolManager {
 	private FTPExceptionHandler exHandler;
 	private Throwable unhandledException;
 	private String currentControlHost, currentDataHost;
+	private boolean readyForCommand;
 
 	
 	
@@ -154,6 +157,7 @@ public class FTPClientManager implements ProtocolManager {
 		this.unhandledException = null;
 		this.exHandler = new FTPExceptionHandler();
 		this.exHandler.setFTPManager(this);
+		this.readyForCommand = true;
 		
 		
 		// Interface commands
@@ -241,9 +245,32 @@ public class FTPClientManager implements ProtocolManager {
 			// Transition from WAIT
 			Transition(responseData.response);
 			
-			// Pass the message through to the terminal state so it can be reported
-			Transition(responseData.responseMessage);
+			// Handle whatever terminal state we ended up at
+			String message = responseData.responseMessage;
+			if (this.currentState == FTPState.ERROR || this.currentState == FTPState.SUCCESS) {
+				// Either everything is good or is good or some not so bad error happened,
+				// just log and print the message and go back to begin
+				Level level;
+				if (this.currentState == FTPState.SUCCESS) {
+					level = Level.INFO;
+				} else {
+					level = Level.WARNING;
+				}
+				
+				logger.log(level, message);
+				
+				this.currentState = FTPState.BEGIN;
+			} else if (this.currentState == FTPState.FAILURE) {
+				// Ruh roh.  Let's throw our exception so it will be picked up by the shell. 
+				// This will also cause the state machine to be reset 
+				throw new ProtocolException(message);
+			}
+			
+			// State is now set from this response, we can unlock
+			this.readyForCommand = true;
+			
 		} catch (Throwable e) {
+			e.printStackTrace();
 			throw new RuntimeException(e.getMessage());
 		}
 	}
@@ -257,7 +284,7 @@ public class FTPClientManager implements ProtocolManager {
 		Pattern responsePattern = Pattern.compile("^(\\d+)(.*)");
 		Matcher responseMatcher = responsePattern.matcher(responseStr);
 		
-		if (responseMatcher.groupCount() < 1) {
+		if (!responseMatcher.find() || responseMatcher.groupCount() < 1) {
 			throw new ProtocolException("Got response from server without a response code");
 		}
 		
@@ -266,9 +293,13 @@ public class FTPClientManager implements ProtocolManager {
 		// Look if we have a specific response for this code
 		FTPResponse response = FTPResponse.getByCode(responseCode);
 		
+		
 		if (response == null) {
 			throw new ProtocolException("Received unknown repsonse code");
 		}
+
+		// Set the diagram state's response field
+		this.currentDiagramState.response = response;
 		
 		String responseMessage = "";
 		if (responseMatcher.groupCount() > 1) {
@@ -285,19 +316,19 @@ public class FTPClientManager implements ProtocolManager {
 	/* State machine */
 
 	public boolean IsReady() {
-		return this.currentState == FTPState.BEGIN;
+		return this.readyForCommand;
 	}
 	
 
 	@Override
 	public void Transition(Object data) throws Throwable {
-		String message;
 		try {
 			switch (this.currentState) {
 			case BEGIN:
 				String commandString = (String)data;
 				// We are being passed a command string
 				this.currentState = FTPState.WAIT;
+				
 				
 				// Parse and act on the command that will bring us to waiting state
 				parseAndExecuteCommand(commandString);
@@ -309,28 +340,10 @@ public class FTPClientManager implements ProtocolManager {
 				this.currentState = this.currentDiagram.get(this.currentDiagramState);
 				break;
 				
-			case SUCCESS:
-			case ERROR:
-				message = (String)data;
-				// Either everything is good or is good or some not so bad error happened,
-				// just log and print the message and go back to begin
-				Level level;
-				if (this.currentState == FTPState.SUCCESS) {
-					level = Level.INFO;
-				} else {
-					level = Level.WARNING;
-				}
+			default:
+				throw new ProtocolException("Transition() called with invalid state.");
 				
-				logger.log(level, message);
 				
-				this.currentState = FTPState.BEGIN;
-				break;
-			
-			case FAILURE:
-				message = (String)data;
-				// Ruh roh.  Let's throw our exception so it will be picked up by the shell. 
-				// This will also cause the state machine to be reset 
-				throw new ProtocolException(message);
 			}
 		} catch (ClassCastException e) {
 			throw new ProtocolException("The state machine was passed the wrong kind of data");
@@ -343,9 +356,11 @@ public class FTPClientManager implements ProtocolManager {
 	// exceptions that occur.
 	private void waitForReady() throws Throwable {
 		while(!IsReady()) {
+			System.out.println("Locking!");
 			CheckException();
 			Thread.sleep(100);
 		}
+		System.out.println("Unlocked!");
 	}
 	
 	
@@ -353,6 +368,7 @@ public class FTPClientManager implements ProtocolManager {
 	public void Reset() {
 		this.currentState = FTPState.BEGIN;
 		this.currentDiagramState = new FTPDiagramState();
+		this.readyForCommand = true;
 	}
 	
 	
@@ -388,6 +404,9 @@ public class FTPClientManager implements ProtocolManager {
 	
 	// Wrapper that calls the correct handler for an FTP Protocol command and sets state diagram info appropriately
 	private void doProtocolCommand(FTPCommand cmd, String[] args) throws Throwable {
+		// "Lock" the state machine thread until we've received a response and set state, or failed.
+		this.readyForCommand= false;
+
 		// Set the current state diagram
 		this.currentDiagram = stateDiagrams.get(cmd);
 		
@@ -424,7 +443,14 @@ public class FTPClientManager implements ProtocolManager {
 				throw new Exception("connect: no host provided");
 			}
 			currentControlHost = command[0];
-			sendControlMessage("NOOP");
+			
+			// Special case here, we will "send" a blank message to initiate the connection
+			// and read the greeting. We'll make it look like a NOOP command to the state machine, 
+			// so that everything works.  A little hacky.
+			readyForCommand = false;
+			currentDiagram = stateDiagrams.get(FTPCommand.NOOP);
+			currentDiagramState.cmd = FTPCommand.NOOP;
+			sendControlMessage("");
 			waitForReady();
 		}
 		
@@ -555,6 +581,17 @@ public class FTPClientManager implements ProtocolManager {
 	
 
 	// Actual protocol handlers
+	
+	public class NOOPhandler implements FTPClientCommandHandler {
+
+		@Override
+		public void handle(String[] commandArgs) throws Throwable {
+			sendControlMessage(FTPCommand.NOOP.name());
+			
+		}
+		
+	}
+	
 	public class USERhandler implements FTPClientCommandHandler {
 
 		@Override

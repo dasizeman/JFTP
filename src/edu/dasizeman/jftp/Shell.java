@@ -80,6 +80,7 @@ public abstract class Shell {
 				//}
 			} catch (Throwable e) {
 				logger.log(Level.SEVERE, e.getMessage());
+				e.printStackTrace();
 			}
 		}while (!inputString.equals("quit"));
 		

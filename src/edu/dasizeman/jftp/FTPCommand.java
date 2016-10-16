@@ -13,5 +13,6 @@ public enum FTPCommand {
 	RETR,
 	PWD,
 	LIST, 
-	HELP
+	HELP,
+	NOOP
 }

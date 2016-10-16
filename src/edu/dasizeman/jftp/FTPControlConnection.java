@@ -86,7 +86,9 @@ public class FTPControlConnection extends Connection implements Runnable {
 	private String ReadFTPResponse() {
 		StringBuffer response = new StringBuffer();
 		
+		
 		try {
+			
 			// Read the first line
 			response.append(this.reader.readLine());
 			
@@ -116,21 +118,35 @@ public class FTPControlConnection extends Connection implements Runnable {
 	@Override
 	public void run() {
 		
-		// Send the command
+		String response = "";
 		try {
-			logger.log(Level.INFO, MODULE_NAME + ":sending \"" + this.nextCommand + "\"");
-			this.writer.write(this.nextCommand + CRLF);
-			this.writer.flush();
+			// Special case, if our next command is blank, it means we're waiting for a greeting
+			// This will block
+			if (this.nextCommand.equals("")) {
+				response = ReadFTPResponse();
+			} else if (this.socket.getInputStream().available() > 0) {
+				
+				// See if there is a message already waiting on the socket.  This can happen 
+				// if the server sends us a timeout notification, etc.  We don't want to block 
+				// if this isn't the case, so we check if there are available bytes on the socket
+				response = ReadFTPResponse();
+			}
+			
+			
+			// If there wasn't a pending response, we can send our command and receive the its response
+			if (response.equals("")) {
+				// Send the command
+					logger.log(Level.INFO, MODULE_NAME + ":sending \"" + this.nextCommand + "\"");
+					this.writer.write(this.nextCommand + CRLF);
+					this.writer.flush();
+				response = ReadFTPResponse();
+			}
 		} catch (IOException e) {
 			throw new RuntimeException(MODULE_NAME + ":failed to send command");
 		}
 		
-		// Receive the response
-		String response = ReadFTPResponse();
 		logger.log(Level.INFO, MODULE_NAME + ": received \"" + response + "\"" );
 		this.manager.ControlDataReceived(response);
-		
-		
 	}
 
 }
