@@ -10,7 +10,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class FTPClientManager implements ProtocolManager {
-	public static final String CRLF = "\r\n";
 	static private FTPClientManager instance;
 	private static Logger logger;
 	
@@ -285,13 +284,12 @@ public class FTPClientManager implements ProtocolManager {
 			case BEGIN:
 				String commandString = (String)data;
 				// We are being passed a command string
-				this.currentState = FTPState.WAIT;
+				//TODO just for testing
+				//this.currentState = FTPState.WAIT;
 				
 				// Parse and act on the command that will bring us to waiting state
 				parseAndExecuteCommand(commandString);
 				
-				//TODO just for testing
-				this.currentState = FTPState.BEGIN;
 				break;
 				
 			case WAIT:
@@ -336,7 +334,10 @@ public class FTPClientManager implements ProtocolManager {
 	}
 
 	private void sendControlMessage(String message) throws Exception {
-		FTPControlConnection.getInstance(this.currentHost).SendCommand(message+CRLF);
+		FTPControlConnection connection = FTPControlConnection.getInstance(this.currentHost);
+		connection.SetProtocolManager(this);
+		connection.SetExceptionHandler(this.exHandler);
+		connection.SendCommand(message);
 	}
 	
 	// Handlers for the shell/interface commands.  I chose to have this separate command

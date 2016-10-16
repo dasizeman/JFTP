@@ -83,13 +83,6 @@ public abstract class Shell {
 			}
 		}while (!inputString.equals("quit"));
 		
-		// Hook the underlying shell to do exit stuff
-		try {
-			doCommand("quit");
-		} catch (Throwable e) {
-			logger.log(Level.SEVERE, e.getMessage());
-		}
-		
 		inputScanner.close();
 		System.out.println("...bye :(");
 	}

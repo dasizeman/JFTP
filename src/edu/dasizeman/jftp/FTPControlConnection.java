@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 public class FTPControlConnection extends Connection implements Runnable {
 	private static FTPControlConnection instance;
 	private static final String MODULE_NAME = "ControlConnection";
+	public static final String CRLF = "\r\n";
 	public static final int DEFAULT_PORT = 21;
 	private static Logger logger;
 	
@@ -117,9 +118,9 @@ public class FTPControlConnection extends Connection implements Runnable {
 		
 		// Send the command
 		try {
-			this.writer.write(this.nextCommand);
-			this.writer.flush();
 			logger.log(Level.INFO, MODULE_NAME + ":sending \"" + this.nextCommand + "\"");
+			this.writer.write(this.nextCommand + CRLF);
+			this.writer.flush();
 		} catch (IOException e) {
 			throw new RuntimeException(MODULE_NAME + ":failed to send command");
 		}
