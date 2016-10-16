@@ -230,6 +230,7 @@ public class FTPClientManager implements ProtocolManager {
 		
 		if(FTPInterfaceCommand.getByAlias(baseCommandStr) == null) {
 			System.out.println("Unsupported command: " + baseCommandStr);
+			Reset();
 			return;
 		}
 		
@@ -284,8 +285,7 @@ public class FTPClientManager implements ProtocolManager {
 			case BEGIN:
 				String commandString = (String)data;
 				// We are being passed a command string
-				//TODO just for testing
-				//this.currentState = FTPState.WAIT;
+				this.currentState = FTPState.WAIT;
 				
 				// Parse and act on the command that will bring us to waiting state
 				parseAndExecuteCommand(commandString);
@@ -293,9 +293,11 @@ public class FTPClientManager implements ProtocolManager {
 				break;
 				
 			case WAIT:
+				//TODO just for testing
+				this.currentState = FTPState.BEGIN;
 				// TODO Receipt of a FTPResponse, called back from a connection thread
-				FTPResponse response = (FTPResponse) data;
-				handleFTPResponse(response);
+				//FTPResponse response = (FTPResponse) data;
+				//handleFTPResponse(response);
 				break;
 				
 			case SUCCESS:
@@ -391,8 +393,8 @@ public class FTPClientManager implements ProtocolManager {
 
 		@Override
 		public void handle(String[] command) {
-			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "QUIT_CMD");
+			// TODO Call server quit, for now just RESET
+			Reset();
 			
 		}
 		
@@ -450,9 +452,9 @@ public class FTPClientManager implements ProtocolManager {
 	public class SERVERHELP_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
-			logger.log(Level.INFO, "SERVERHELP_CMD");
+		public void handle(String[] command) throws Exception {
+			// Call the HELP protocol handler
+			FTPCmdMap.get(FTPCommand.HELP).handle(command);
 			
 		}
 		
@@ -463,6 +465,7 @@ public class FTPClientManager implements ProtocolManager {
 		public void handle(String[] command) {
 			// TODO Auto-generated method stub
 			System.out.println(FTPInterfaceCommand.GetHelpString());
+			Reset();
 		}
 		
 	}
@@ -581,8 +584,12 @@ public class FTPClientManager implements ProtocolManager {
 	public class HELPhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			
+		public void handle(String[] command) throws Exception {
+			String commandStr = FTPCommand.HELP.name();
+			if (command.length > 0) {
+				commandStr += " " + String.join(" ", command);
+			}
+			sendControlMessage(commandStr);
 		}
 		
 	}
