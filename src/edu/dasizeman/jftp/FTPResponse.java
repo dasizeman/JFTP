@@ -31,7 +31,8 @@ public enum FTPResponse {
 	NOT_LOGGED_IN(530, "Not logged in."),
 	NEED_PASS(331, "User name okay, need password."),
 	ACCT_NEEDED(332, "Need account for login."),
-	ACCT_NEEDED_TO_STORE(532, "Need account for storing files.");
+	ACCT_NEEDED_TO_STORE(532, "Need account for storing files."),
+	OTHER(0, "Used for representing responses received by the client that don't require protocol action");
 	
 	public final int code;
 	public String message;

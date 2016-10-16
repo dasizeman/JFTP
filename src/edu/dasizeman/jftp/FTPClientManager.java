@@ -165,19 +165,19 @@ public class FTPClientManager implements ProtocolManager {
 	}
 	
 	private FTPClientCommandHandler getHandlerInstanceForCommand(String commandName) {
-			// Build the name of the inner handler class
-			FTPClientCommandHandler handlerInstance = null;
-			try {
-			String handlerClassName = FTPClientManager.class.getName() + "$" + commandName + "handler";
-			
-			// Get a reference to its class object
-			Class<?> handlerClass = Class.forName(handlerClassName);
-			
-			// Now we have to get at its constructor
-			Constructor<?> handlerClassConstructor = handlerClass.getConstructor(new Class[]{this.getClass()});
-			
-			// And instantiate it
-			handlerInstance = (FTPClientCommandHandler)handlerClassConstructor.newInstance(new Object[]{this});
+				// Build the name of the inner handler class
+				FTPClientCommandHandler handlerInstance = null;
+				try {
+				String handlerClassName = FTPClientManager.class.getName() + "$" + commandName + "handler";
+				
+				// Get a reference to its class object
+				Class<?> handlerClass = Class.forName(handlerClassName);
+				
+				// Now we have to get at its constructor
+				Constructor<?> handlerClassConstructor = handlerClass.getConstructor(new Class[]{this.getClass()});
+				
+				// And instantiate it
+				handlerInstance = (FTPClientCommandHandler)handlerClassConstructor.newInstance(new Object[]{this});
 
 			} catch (InstantiationException | IllegalAccessException | ClassNotFoundException 
 					| IllegalArgumentException | InvocationTargetException | NoSuchMethodException 
@@ -220,7 +220,7 @@ public class FTPClientManager implements ProtocolManager {
 	}
 	
 	
-	private void parseAndExecuteCommand(String command) throws Exception {
+	private void parseAndExecuteCommand(String command) throws Throwable {
 		String[] tokens = command.split(" ");
 		if (tokens.length < 1) {
 			throw new Exception("Command parsing got 0 tokens...what?");
@@ -238,12 +238,6 @@ public class FTPClientManager implements ProtocolManager {
 		
 		FTPInterfaceCommand cmd = FTPInterfaceCommand.getByAlias(baseCommandStr);
 		FTPClientManager.FTPInterfaceCmdMap.get(cmd).handle(cmdArgs);
-
-		// TODO implement command parsing and handing off to the correct handler
-		// each handler must set the current state diagram appropriately
-		
-		//TODO set current diagram state's command section to this command so we can map
-		// state diagrams correctly
 	}
 
 	@Override
@@ -252,7 +246,7 @@ public class FTPClientManager implements ProtocolManager {
 		try {
 			response = parseControlResponse(data);
 			Transition(response);
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			throw new RuntimeException(e.getMessage());
 		}
 	}
@@ -270,16 +264,17 @@ public class FTPClientManager implements ProtocolManager {
 		return null;
 	}
 	
-	private void handleFTPResponse(FTPResponse response) {
-		// 
-		switch (response) {
-			
+	// Waits until the state machine is ready for a new command and throws any
+	// exceptions that occur.
+	private void waitForReady() throws Throwable {
+		while(!IsReady()) {
+			CheckException();
+			Thread.sleep(100);
 		}
 	}
-	
 
 	@Override
-	public void Transition(Object data) throws Exception {
+	public void Transition(Object data) throws Throwable {
 		try {
 			switch (this.currentState) {
 			case BEGIN:
@@ -293,11 +288,8 @@ public class FTPClientManager implements ProtocolManager {
 				break;
 				
 			case WAIT:
-				//TODO just for testing
-				this.currentState = FTPState.BEGIN;
-				// TODO Receipt of a FTPResponse, called back from a connection thread
-				//FTPResponse response = (FTPResponse) data;
-				//handleFTPResponse(response);
+				// Change state based on the current state diagram
+				this.currentState = this.currentDiagram.get(this.currentDiagramState);
 				break;
 				
 			case SUCCESS:
@@ -305,6 +297,14 @@ public class FTPClientManager implements ProtocolManager {
 				String message = (String)data;
 				// Either everything is good or is good or some not so bad error happened,
 				// just log and print the message and go back to begin
+				Level level;
+				if (this.currentState == FTPState.SUCCESS) {
+					level = Level.INFO;
+				} else {
+					level = Level.WARNING;
+				}
+				
+				logger.log(level, message);
 				
 				this.currentState = FTPState.BEGIN;
 				break;
@@ -331,9 +331,6 @@ public class FTPClientManager implements ProtocolManager {
 	
 	
 	
-	public interface FTPClientCommandHandler {
-		public void handle(String[] commandArgs) throws Exception;
-	}
 
 	private void sendControlMessage(String message) throws Exception {
 		FTPControlConnection connection = FTPControlConnection.getInstance(this.currentHost);
@@ -342,12 +339,35 @@ public class FTPClientManager implements ProtocolManager {
 		connection.SendCommand(message);
 	}
 	
+	// Wrapper that calls the correct handler for an FTP Protocol command and sets state diagram info appropriately
+	private void doProtocolCommand(FTPCommand cmd, String[] args) throws Throwable {
+		// Set the current state diagram
+		this.currentDiagram = stateDiagrams.get(cmd);
+		
+		// Set the diagram state's command field
+		this.currentDiagramState.cmd = cmd;
+		
+		// Invoke the handler with the arguments
+		FTPCmdMap.get(cmd).handle(args);
+		
+		// Wait for the state machine to be ready 
+		waitForReady();
+	}
+	
+	private void badCommand() throws Exception {
+		throw new Exception("Incorrect command syntax.  See 'help' for details");
+	}
+
+	public interface FTPClientCommandHandler {
+		public void handle(String[] commandArgs) throws Throwable;
+	}
+	
 	// Handlers for the shell/interface commands.  I chose to have this separate command
 	// layer so that the user interface could be more intuitive than just entering raw FTP commands.
 	public class CONNECT_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) throws Exception {
+		public void handle(String[] command) throws Throwable {
 			// TODO For now we will send a NO-OP command as the first message
 			
 			// Argument must be the <hostname>:<port> string
@@ -356,16 +376,29 @@ public class FTPClientManager implements ProtocolManager {
 			}
 			currentHost = command[0];
 			sendControlMessage("NOOP");
+			waitForReady();
 		}
 		
 	}
 	public class LOGIN_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
+		public void handle(String[] command) throws Throwable {
 			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "LOGIN_CMD");
+			String[] flags = new String[]{"-u", "-p"};
+			ParseMap parsed = Parser.Parse(command, flags);
 			
+			if (parsed == null) {
+				badCommand();
+				return;
+			}
+			
+			
+			// Send a USER FTP command
+			doProtocolCommand(FTPCommand.USER, new String[]{parsed.get("-u")});
+			
+			// Send a PASS FTP command
+			doProtocolCommand(FTPCommand.PASS, new String[]{parsed.get("-p")});
 		}
 		
 	}
@@ -452,9 +485,9 @@ public class FTPClientManager implements ProtocolManager {
 	public class SERVERHELP_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) throws Exception {
+		public void handle(String[] command) throws Throwable {
 			// Call the HELP protocol handler
-			FTPCmdMap.get(FTPCommand.HELP).handle(command);
+			doProtocolCommand(FTPCommand.HELP, command);
 			
 		}
 		
@@ -476,8 +509,14 @@ public class FTPClientManager implements ProtocolManager {
 	public class USERhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+		public void handle(String[] command) throws Throwable {
+			if (command.length < 1) {
+				badCommand();
+			}
+			
+			// Send a USER FTP command
+			sendControlMessage(FTPCommand.USER.name() + " " + command[0]);
+			
 			
 		}
 		
@@ -485,8 +524,13 @@ public class FTPClientManager implements ProtocolManager {
 	public class PASShandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+		public void handle(String[] command) throws Throwable {
+			if (command.length < 1) {
+				badCommand();
+			}
+			
+			// Send a PASS FTP command
+			sendControlMessage(FTPCommand.PASS.name() + " " + command[0]);
 			
 		}
 		
@@ -584,7 +628,7 @@ public class FTPClientManager implements ProtocolManager {
 	public class HELPhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) throws Exception {
+		public void handle(String[] command) throws Throwable {
 			String commandStr = FTPCommand.HELP.name();
 			if (command.length > 0) {
 				commandStr += " " + String.join(" ", command);

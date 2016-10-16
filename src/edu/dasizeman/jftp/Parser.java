@@ -1,15 +1,14 @@
 package edu.dasizeman.jftp;
 
-import java.util.HashMap;
 import java.util.HashSet;
 
 public class Parser {
-	public static  HashMap<String,String> Parse(String[] input, String[] flags) {
+	public static  ParseMap Parse(String[] input, String[] flags) {
 		if (input.length < 2 || flags.length < 1) {
 			return null;
 		}
 		HashSet<String> requiredFlags = new HashSet<String>();
-		HashMap<String,String> results = new HashMap<String,String>();
+		ParseMap results = new ParseMap();
 		for (String str : flags) {
 			requiredFlags.add(str);
 		}

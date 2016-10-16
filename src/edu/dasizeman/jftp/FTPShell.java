@@ -14,12 +14,6 @@ public class FTPShell extends Shell {
 		// TODO Call for a state transition from begin, with the command line
 			manager.Transition(commandStr);
 			
-		// Wait for the state machine to get back to the begin state.
-		while(!manager.IsReady()) { // totally spinlocking lol
-			manager.CheckException();
-			Thread.sleep(100);
-		}
-			
 		} catch (Exception e) { // TODO something out-of-protocol happened here, so we probably need to just reset everything and throw up
 			manager.Reset();
 			throw e;

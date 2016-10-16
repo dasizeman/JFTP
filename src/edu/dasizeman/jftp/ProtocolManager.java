@@ -4,7 +4,7 @@ public interface ProtocolManager {
 	
 	public void Reset();
 	
-	public void Transition(Object data) throws Exception; 
+	public void Transition(Object data) throws Throwable; 
 	
 	public void ControlDataReceived(String data);
 	
