@@ -12,7 +12,7 @@ public enum FTPResponse {
 	BAD_CMD_SEQUENCE(503, "Bad sequence of commands."),
 	UNIMPLEMENTED_PARAM(504, "Command not implemented for that parameter."),
 	RESTART_MARKER_REPLY(110, "UNIMPLEMENTED: MARK %4d = %4d"),
-	STATUS_REPLY(211, "System status or help reply"),
+	STATUS_REPLY(211, "System status, or system help reply."),
 	DIR_STATUS(212, "Directory status."),
 	FILE_STATUS(213, "File status."),
 	HELP_MESSAGE(214, "Help message."),
@@ -32,10 +32,19 @@ public enum FTPResponse {
 	NEED_PASS(331, "User name okay, need password."),
 	ACCT_NEEDED(332, "Need account for login."),
 	ACCT_NEEDED_TO_STORE(532, "Need account for storing files."),
-	OTHER(0, "Used for representing responses received by the client that don't require protocol action");
+	ABOUT_TO_OPEN_DATA(150, "File status okay; about to open data connection."),
+	FILE_ACTION_COMPLETED(250, "Requested file action okay, completed."),
+	PATH_CREATED(257, "\"PATHNAME\" created."),
+	FILE_ACTION_PENDING(350, "Requested file action pending further information."),
+	FILE_BUSY(450, "Requested file action not taken."),
+	SERVER_ERROR(451, "Requested action aborted: local error in processing."),
+	INSUFF_STORAGE(452, "Requested action not taken. Insufficient storage space in system."),
+	FILE_UNAVAIL(550, "Requested action not taken. File unavailable"),
+	ABRT_OUT_OF_SPACE(552, "Requested file action aborted. Exceeded storage allocation"),
+	BAD_FILE_NAME(553, "Requested action not taken. File name not allowed.");
 	
 	public final int code;
-	public String message;
+	public final String message;
 	
 	FTPResponse(int code, String message) {
 		this.code = code;
