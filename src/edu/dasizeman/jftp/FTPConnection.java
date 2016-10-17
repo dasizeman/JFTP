@@ -2,12 +2,12 @@ package edu.dasizeman.jftp;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.ServerSocket;
-import java.nio.CharBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -49,7 +49,6 @@ public class FTPConnection extends Connection implements Runnable {
 		
 		if (controlInstance == null) {
 			controlInstance = new FTPConnection(host);
-			controlInstance.mode = Mode.CONTROL;
 		}
 		
 		// If the host address or port have changed, we must re-connect
@@ -76,7 +75,6 @@ public class FTPConnection extends Connection implements Runnable {
 		}
 		if(dataInstance == null) {
 			dataInstance = new FTPConnection(host, type);
-			dataInstance.mode = Mode.DATA;
 		}
 		
 		switch (type) {
@@ -102,7 +100,7 @@ public class FTPConnection extends Connection implements Runnable {
 					|| dataInstance.port != previousPort
 					|| !dataInstance.socket.isConnected()) {
 				dataInstance.close();
-				dataInstance = new FTPConnection(host);
+				dataInstance = new FTPConnection(host, type);
 			}
 			break;
 			
@@ -120,6 +118,7 @@ public class FTPConnection extends Connection implements Runnable {
 	public FTPConnection(String host) throws Exception {
 		super(host);
 		Connect();
+		this.mode = Mode.CONTROL;
 		this.writer = new BufferedWriter(new OutputStreamWriter(this.socket.getOutputStream()));
 		this.reader = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
 		this.MODULE_NAME = "ControlConnection";
@@ -132,6 +131,7 @@ public class FTPConnection extends Connection implements Runnable {
 	public FTPConnection(String host, FTPCommand type) throws Exception {
 		this.filePath = "";
 		this.MODULE_NAME = "DataConnection";
+		this.mode = Mode.DATA;
 		if (type == FTPCommand.PASV || type == FTPCommand.EPSV) {
 			// Copied from other constructor because I don't have time
 			if (!parseHostString(host)) {
@@ -217,8 +217,18 @@ public class FTPConnection extends Connection implements Runnable {
 	}
 	
 	// Keeps reading the socket and dumping to a file until the connection is closed
-	private void dumpToFile(String path) {
-		//TODO
+	private void dumpToFile(String path) throws Exception {
+		//Open a file output stream
+		FileOutputStream fout = new FileOutputStream(path);
+		
+		// Read the bytes to the file until it closes
+		int count = 0;
+		byte[] buffer = new byte[16*1024];
+		while ((count = this.socket.getInputStream().read(buffer)) > 0) {
+			fout.write(buffer, 0, count);
+		}
+		
+		fout.close();
 	}
 	
 	
@@ -305,9 +315,15 @@ public class FTPConnection extends Connection implements Runnable {
 	}
 	
 	private void runData() {
-		if (filePath.equals("")) {
-			this.manager.TextDataReceived(readASCIIData());
+		try {
+			if (filePath.equals("")) {
+				this.manager.TextDataReceived(readASCIIData());
+			} else {
+				logger.log(Level.INFO, MODULE_NAME + ": writing to " + filePath);
+				dumpToFile(filePath);
+			}
+		} catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
 		}
 	}
-
 }

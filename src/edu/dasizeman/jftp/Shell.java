@@ -62,7 +62,7 @@ public abstract class Shell {
 		System.out.println("Type 'help' for commands.");
 		do {
 			System.out.print(">");
-			inputString = inputScanner.nextLine().toLowerCase(); 
+			inputString = inputScanner.nextLine(); 
 			if (inputString.equals("")) {
 				continue;
 			}

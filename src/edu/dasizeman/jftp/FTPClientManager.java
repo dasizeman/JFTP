@@ -419,7 +419,7 @@ public class FTPClientManager implements ProtocolManager {
 			throw new Exception("Command parsing got 0 tokens...what?");
 		}
 		
-		String baseCommandStr = tokens[0];
+		String baseCommandStr = tokens[0].toLowerCase();
 		
 		if(FTPInterfaceCommand.getByAlias(baseCommandStr) == null) {
 			System.out.println("Unsupported command: " + baseCommandStr);
@@ -599,9 +599,13 @@ public class FTPClientManager implements ProtocolManager {
 	public class GET_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "GET_CMD");
+		public void handle(String[] command) throws Throwable {
+			if (command.length != 1) {
+				badCommand();
+			}
+			
+			// Do  a RETR FTP command
+			doProtocolCommand(FTPCommand.RETR, command);
 			
 		}
 		
@@ -755,8 +759,9 @@ public class FTPClientManager implements ProtocolManager {
 	public class RETRhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+		public void handle(String[] command) throws Throwable {
+			receiveData(command[0]);
+			sendControlMessage(FTPCommand.RETR.name() + " " + command[0]);
 			
 		}
 		
