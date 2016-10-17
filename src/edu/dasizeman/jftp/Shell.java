@@ -71,7 +71,6 @@ public abstract class Shell {
 				doCommand(inputString);
 			} catch (Throwable e) {
 				logger.log(Level.SEVERE, e.getClass().getName() + " : " + e.getMessage() );
-				e.printStackTrace();
 			}
 		}while (!inputString.equals("quit"));
 		
