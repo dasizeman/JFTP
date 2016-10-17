@@ -37,7 +37,7 @@ public abstract class Shell {
 	            flush();
 	        }
 	    };
-		consoleLog.setLevel(Level.ALL);
+		consoleLog.setLevel(Level.INFO);
 		logFile.setFormatter(simpleFormatter);
 		logFile.setLevel(Level.ALL);
 		
@@ -70,7 +70,7 @@ public abstract class Shell {
 			try {
 				doCommand(inputString);
 			} catch (Throwable e) {
-				logger.log(Level.SEVERE, e.getMessage());
+				logger.log(Level.SEVERE, e.getClass().getName() + " : " + e.getMessage() );
 				e.printStackTrace();
 			}
 		}while (!inputString.equals("quit"));

@@ -414,6 +414,7 @@ public class FTPClientManager implements ProtocolManager {
 		this.controlFinished = true;
 		this.dataFinished = true;
 		this.unhandledException = null;
+		FTPConnection.ResetDataConnection();
 	}
 	
 	
@@ -467,7 +468,7 @@ public class FTPClientManager implements ProtocolManager {
 		// "Lock" the state machine thread until we've received a response and set state, or failed.
 		this.controlFinished= false;
 
-		if (!FTPConnection.HaveControlInstance()) {
+		if (!FTPConnection.HasControlInstance()) {
 			throw new ProtocolException("Must connect first.");
 		}
 
@@ -645,6 +646,9 @@ public class FTPClientManager implements ProtocolManager {
 		public void handle(String[] command) throws Throwable {
 			
 			// Send a LIST FTP command
+
+			dataFinished = false;
+			receiveData("");
 			doProtocolCommand(FTPCommand.LIST, command);
 		}
 		
@@ -807,8 +811,6 @@ public class FTPClientManager implements ProtocolManager {
 			
 			// Connect to the data port and start receiving.  A blank
 			// argument means text data will be read.
-			dataFinished = false;
-			receiveData("");
 			sendControlMessage(commandStr);
 			
 		}

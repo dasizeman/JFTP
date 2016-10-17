@@ -73,17 +73,6 @@ public class FTPConnection extends Connection implements Runnable {
 		if(dataInstance == null) {
 			dataInstance = new FTPConnection(host, type);
 		}
-		
-		switch (type) {
-		case PORT:
-		case EPRT:
-			// For PORT connections, make sure the connection is open
-			if (!dataInstance.socket.isConnected()) {
-				dataInstance = new FTPConnection(host,type);
-			}
-			break;
-		case PASV:
-		case EPSV:
 			// If this is for a passive connection it's just like a control connection, we care about updating if the host
 			// changes
 			// If the host address or port have changed, we must re-connect
@@ -99,19 +88,19 @@ public class FTPConnection extends Connection implements Runnable {
 				dataInstance.close();
 				dataInstance = new FTPConnection(host, type);
 			}
-			break;
-			
-		default:
-			throw new Exception("FTPConnection must be passed one of PORT, EPRT, PASV, or EPSV");
-				
-		}
 		
 		
 		
 		return dataInstance;
 	}
 	
-	public static boolean HaveControlInstance() {
+	public static void ResetDataConnection() {
+		// We don't need this connection anymore, let the GC take care of it,
+		// and we'll make a new one later
+		dataInstance = null;
+	}
+	
+	public static boolean HasControlInstance() {
 		return !(controlInstance == null);
 	}
 
@@ -123,9 +112,8 @@ public class FTPConnection extends Connection implements Runnable {
 		this.writer = new BufferedWriter(new OutputStreamWriter(this.socket.getOutputStream()));
 		this.reader = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
 		this.MODULE_NAME = "ControlConnection";
-		logger.log(Level.INFO, MODULE_NAME + ":connecting to " + host);
+		logger.log(Level.FINE, MODULE_NAME + ":connecting to " + host);
 		
-		// TODO Figure out our host strings for active
 	}
 	
 	// Used for data connections
@@ -139,7 +127,7 @@ public class FTPConnection extends Connection implements Runnable {
 				throw new Exception("Could not parse connection host: " + host);
 			}
 			Connect();
-			logger.log(Level.INFO, MODULE_NAME + ":connecting to " + host);
+			logger.log(Level.FINE, MODULE_NAME + ":connecting to " + host);
 			
 		} else if (type == FTPCommand.PORT || type == FTPCommand.EPRT) {
 			int dataPort = this.socket.getLocalPort() + 1;
@@ -221,11 +209,15 @@ public class FTPConnection extends Connection implements Runnable {
 		//Open a file output stream
 		FileOutputStream fout = new FileOutputStream(path);
 		
-		// Read the bytes to the file until it closes
-		int count = 0;
-		byte[] buffer = new byte[16*1024];
-		while ((count = this.socket.getInputStream().read(buffer)) > 0) {
-			fout.write(buffer, 0, count);
+		try {
+			// Read the bytes to the file until it closes
+			int count = 0;
+			byte[] buffer = new byte[16*1024];
+			while ((count = this.socket.getInputStream().read(buffer)) > 0) {
+				fout.write(buffer, 0, count);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 		
 		fout.close();
@@ -300,7 +292,7 @@ public class FTPConnection extends Connection implements Runnable {
 			// If there wasn't a pending response, we can send our command and receive the its response
 			if (response.equals("")) {
 				// Send the command
-					logger.log(Level.INFO, MODULE_NAME + ":sending \"" + this.nextCommand + "\"");
+					logger.log(Level.FINE, MODULE_NAME + ":sending \"" + this.nextCommand + "\"");
 					this.writer.write(this.nextCommand + CRLF);
 					this.writer.flush();
 				response = ReadFTPResponse();
@@ -309,7 +301,7 @@ public class FTPConnection extends Connection implements Runnable {
 			throw new RuntimeException(MODULE_NAME + ":failed to send command");
 		}
 		
-		logger.log(Level.INFO, MODULE_NAME + ": received \"" + response + "\"" );
+		logger.log(Level.FINE, MODULE_NAME + ": received \"" + response + "\"" );
 		this.manager.ControlDataReceived(response);
 		
 	}
@@ -319,7 +311,7 @@ public class FTPConnection extends Connection implements Runnable {
 			if (filePath.equals("")) {
 				this.manager.TextDataReceived(readASCIIData());
 			} else {
-				logger.log(Level.INFO, MODULE_NAME + ": writing to " + filePath);
+				logger.log(Level.FINE, MODULE_NAME + ": writing to " + filePath);
 				dumpToFile(filePath);
 			}
 		} catch (Exception e) {
