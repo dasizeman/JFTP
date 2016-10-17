@@ -9,7 +9,7 @@ public enum FTPInterfaceCommand {
 	CD_CMD("cd", " <path> : Change directory.\n"),
 	CDUP_CMD("cdup", " : go up a directory.\n"),
 	QUIT_CMD("quit", " : exit JFTP.\n"),
-	PASV_CMD("passive", " -p <port> : enter passive mode with selected data port.\n"),
+	PASV_CMD("passive", " [-e]: enter PASV mode with selected data port.  Use the -e flag for EPSV\n"),
 	//ACTV_CMD("active", " -p <port> : enter active mode with selected data port.\n"), // Not supporting ACTIVE transfer modes due to lack of time
 	GET_CMD("get", " <filename> : download the selected file.\n"),
 	PWD_CMD("pwd", " : print the current server directory.\n"),

@@ -455,6 +455,9 @@ public class FTPClientManager implements ProtocolManager {
 	private void receiveData(String file) throws Exception {
 		if (file == null)
 			file = "";
+		if (this.currentDataHost == null || this.dataMode == null) {
+			throw new ProtocolException("No data connection is configured.  Try the 'passive' command");
+		}
 		// Set up a data connection
 		FTPConnection dataConnection = FTPConnection.getDataInstance(currentDataHost, dataMode);
 		dataConnection.SetProtocolManager(this);
