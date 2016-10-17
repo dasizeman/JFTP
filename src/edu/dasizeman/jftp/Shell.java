@@ -54,8 +54,8 @@ public abstract class Shell {
 	
 	protected abstract String welcomeMessage();
 	
-	public void run() {
-		Scanner inputScanner = new Scanner(System.in);
+	public void run(Scanner scanner) {
+		Scanner inputScanner = scanner;
 		String inputString = "";
 
 		System.out.println(welcomeMessage());
