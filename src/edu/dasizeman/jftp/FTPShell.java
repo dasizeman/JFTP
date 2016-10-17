@@ -16,7 +16,6 @@ public class FTPShell extends Shell {
 			
 		} catch (Exception e) { // TODO something out-of-protocol happened here, so we probably need to just reset everything and throw up
 			manager.Reset();
-			System.out.println("Caught by shell!");
 			throw e;
 		}
 		

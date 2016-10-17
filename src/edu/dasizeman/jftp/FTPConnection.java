@@ -37,9 +37,6 @@ public class FTPConnection extends Connection implements Runnable {
 	private String filePath;
 	
 	
-	// Data connection
-	private String localHostIPV4, localHostIPV6;
-	
 	
 	public static FTPConnection getControlInstance(String host) throws Exception {
 		// If no port is given, append the default port
@@ -112,6 +109,10 @@ public class FTPConnection extends Connection implements Runnable {
 		
 		
 		return dataInstance;
+	}
+	
+	public static boolean HaveControlInstance() {
+		return !(controlInstance == null);
 	}
 
 	// Used for control connections

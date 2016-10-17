@@ -41,6 +41,7 @@ public enum FTPResponse {
 	INSUFF_STORAGE(452, "Requested action not taken. Insufficient storage space in system."),
 	FILE_UNAVAIL(550, "Requested action not taken. File unavailable"),
 	ABRT_OUT_OF_SPACE(552, "Requested file action aborted. Exceeded storage allocation"),
+	ENTERING_EPSV(229, "Entering extended passive mode."),
 	BAD_FILE_NAME(553, "Requested action not taken. File name not allowed.");
 	
 	public final int code;

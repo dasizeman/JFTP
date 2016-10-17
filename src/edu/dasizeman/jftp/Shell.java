@@ -1,8 +1,6 @@
 package edu.dasizeman.jftp;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Scanner;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
@@ -71,17 +69,6 @@ public abstract class Shell {
 
 			try {
 				doCommand(inputString);
-				/*
-				String[] flags = new String[]{"-u", "-p"};
-				HashMap <String,String> result = Parser.Parse(Arrays.copyOfRange(inputString.split(" "), 1, inputString.split(" ").length), flags);
-				if (result == null)
-					System.out.println("Parsing failed!");
-				else {
-					for (String key : result.keySet()) {
-						System.out.println(key + " - " + result.get(key));
-					}
-				}
-				*/
 			} catch (Throwable e) {
 				logger.log(Level.SEVERE, e.getMessage());
 				e.printStackTrace();

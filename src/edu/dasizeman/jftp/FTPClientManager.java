@@ -112,6 +112,7 @@ public class FTPClientManager implements ProtocolManager {
 		stateDiagrams.put(FTPCommand.PORT, diagramOne);
 		stateDiagrams.put(FTPCommand.PWD, diagramOne);
 		stateDiagrams.put(FTPCommand.NOOP, diagramOne);
+		stateDiagrams.put(FTPCommand.EPSV, diagramOne);
 		
 		// APPE, LIST, NLST, REIN, RETR, STOR, and STOU.
 		stateDiagrams.put(FTPCommand.LIST, diagramTwo);
@@ -145,7 +146,6 @@ public class FTPClientManager implements ProtocolManager {
 	private String currentControlHost, currentDataHost;
 	private boolean controlFinished, dataFinished;
 	private FTPCommand dataMode;
-	private FTPClientManager selfPtr;
 
 	
 	
@@ -159,7 +159,6 @@ public class FTPClientManager implements ProtocolManager {
 		this.controlFinished = true;
 		this.dataFinished = true;
 		this.dataMode = FTPCommand.PASV;
-		this.selfPtr = this;
 		
 		
 		// Interface commands
@@ -193,7 +192,6 @@ public class FTPClientManager implements ProtocolManager {
 			} catch (InstantiationException | IllegalAccessException | ClassNotFoundException 
 					| IllegalArgumentException | InvocationTargetException | NoSuchMethodException 
 					| SecurityException e) {
-				e.printStackTrace();
 				System.exit(1);
 			}
 			
@@ -284,7 +282,6 @@ public class FTPClientManager implements ProtocolManager {
 			this.controlFinished = true;
 			
 		} catch (Throwable e) {
-			e.printStackTrace();
 			throw new RuntimeException(e.getMessage());
 		}
 	}
@@ -325,6 +322,9 @@ public class FTPClientManager implements ProtocolManager {
 		if (response == FTPResponse.ENTERING_PASV) {
 			this.currentDataHost = parsePASVResponse(responseMessage);
 			this.dataMode = FTPCommand.PASV;
+		} else if (response == FTPResponse.ENTERING_EPSV) {
+			this.currentDataHost = parseEPSVResponse(responseMessage);
+			this.dataMode = FTPCommand.EPSV;
 		}
 		
 		
@@ -354,6 +354,17 @@ public class FTPClientManager implements ProtocolManager {
 		hostStr.append(portString);
 		
 		return hostStr.toString();
+	}
+	
+	private String parseEPSVResponse (String response) throws ProtocolException {
+		Pattern epsvPattern = Pattern.compile("...(\\d+).");
+		Matcher epsvMatcher = epsvPattern.matcher(response);
+		if (!epsvMatcher.find() || epsvMatcher.groupCount() < 1) {
+			throw new ProtocolException("Could not parse EPSV command.");
+		}
+		
+		String ip = this.currentControlHost.replaceFirst(":\\d+", "");
+		return ip + ":" + epsvMatcher.group(1);
 	}
 	
 	/* State machine */
@@ -455,6 +466,10 @@ public class FTPClientManager implements ProtocolManager {
 	private void doProtocolCommand(FTPCommand cmd, String[] args) throws Throwable {
 		// "Lock" the state machine thread until we've received a response and set state, or failed.
 		this.controlFinished= false;
+
+		if (!FTPConnection.HaveControlInstance()) {
+			throw new ProtocolException("Must connect first.");
+		}
 
 		// Set the current state diagram
 		this.currentDiagram = stateDiagrams.get(cmd);
@@ -565,10 +580,10 @@ public class FTPClientManager implements ProtocolManager {
 	public class QUIT_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Call server quit, for now just RESET
-			Reset();
+		public void handle(String[] command) throws Throwable {
 			
+			// Send QUIT FTP command
+			doProtocolCommand(FTPCommand.QUIT, command);
 		}
 		
 	}
@@ -576,7 +591,7 @@ public class FTPClientManager implements ProtocolManager {
 
 		@Override
 		public void handle(String[] command) throws Throwable {
-			if (command.length > 1 && command[1].equals("-e")) {
+			if (command.length > 0 && command[0].equals("-e")) {
 				// EPSV
 				doProtocolCommand(FTPCommand.EPSV, command);
 			}else {
@@ -589,9 +604,14 @@ public class FTPClientManager implements ProtocolManager {
 	public class ACTV_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "ACTV_CMD");
+		public void handle(String[] command) throws Throwable {
+			String[] requiredFlags = new String[]{"-p"};
+			ParseMap flags = Parser.Parse(command, requiredFlags);
+			if (flags == null) {
+				badCommand();
+			}
+			
+			doProtocolCommand(FTPCommand.PORT, new String[]{flags.get("-p")});
 			
 		}
 		
@@ -714,8 +734,8 @@ public class FTPClientManager implements ProtocolManager {
 	public class QUIThandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+		public void handle(String[] command) throws Throwable {
+			sendControlMessage(FTPCommand.QUIT.name());
 			
 		}
 		
@@ -732,8 +752,8 @@ public class FTPClientManager implements ProtocolManager {
 	public class EPSVhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+		public void handle(String[] command) throws Throwable {
+			sendControlMessage(FTPCommand.EPSV.name());
 			
 		}
 		
@@ -741,8 +761,9 @@ public class FTPClientManager implements ProtocolManager {
 	public class PORThandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
+		public void handle(String[] command) throws Throwable {
 			// TODO Auto-generated method stub
+			System.out.println(FTPConnection.getControlInstance(currentControlHost).GetIPV4Host());
 			
 		}
 		
