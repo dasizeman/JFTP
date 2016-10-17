@@ -358,6 +358,7 @@ public class FTPClientManager implements ProtocolManager {
 		this.currentState = FTPState.BEGIN;
 		this.currentDiagramState = new FTPDiagramState();
 		this.readyForCommand = true;
+		this.unhandledException = null;
 	}
 	
 	
@@ -537,9 +538,8 @@ public class FTPClientManager implements ProtocolManager {
 	public class PWD_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "PWD_CMD");
+		public void handle(String[] command) throws Throwable {
+			doProtocolCommand(FTPCommand.PWD, command);
 			
 		}
 		
@@ -693,8 +693,8 @@ public class FTPClientManager implements ProtocolManager {
 	public class PWDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+		public void handle(String[] command) throws Throwable {
+			sendControlMessage(FTPCommand.PWD.name());
 			
 		}
 		
