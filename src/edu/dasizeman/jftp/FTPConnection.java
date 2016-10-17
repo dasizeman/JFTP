@@ -217,7 +217,7 @@ public class FTPConnection extends Connection implements Runnable {
 				fout.write(buffer, 0, count);
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
+			logger.log(Level.FINE, e.getClass().getName() + e.getMessage());
 		}
 		
 		fout.close();

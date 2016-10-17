@@ -625,6 +625,9 @@ public class FTPClientManager implements ProtocolManager {
 				badCommand();
 			}
 			
+			// Prepare the data connection
+			receiveData(command[0]);
+			
 			// Do  a RETR FTP command
 			doProtocolCommand(FTPCommand.RETR, command);
 			
@@ -785,7 +788,6 @@ public class FTPClientManager implements ProtocolManager {
 
 		@Override
 		public void handle(String[] command) throws Throwable {
-			receiveData(command[0]);
 			sendControlMessage(FTPCommand.RETR.name() + " " + command[0]);
 			
 		}
