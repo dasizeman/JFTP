@@ -154,8 +154,7 @@ public class FTPConnection extends Connection implements Runnable {
 	}
 	
 	public String GetIPV4Host() {
-		//TODO
-		return "";
+		return this.socket.getInetAddress().getHostAddress();
 	}
 	
 	public String GetIPV6Host() {
