@@ -12,7 +12,7 @@ public class FTPShell extends Shell {
 	public void doCommand(String commandStr) throws Throwable {
 		try {
 		// TODO Call for a state transition from begin, with the command line
-			manager.Transition(commandStr);
+			manager.ParseAndExecuteInterfaceCommand(commandStr);
 			
 		} catch (Exception e) { // TODO something out-of-protocol happened here, so we probably need to just reset everything and throw up
 			manager.Reset();

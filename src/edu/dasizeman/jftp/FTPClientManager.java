@@ -242,8 +242,8 @@ public class FTPClientManager implements ProtocolManager {
 		try {
 			responseData = parseControlResponse(data);
 			
-			// Transition from WAIT
-			Transition(responseData.response);
+			// Transition from WAIT based on our diagram state
+			transition(FTPState.WAIT);
 			
 			// Handle whatever terminal state we ended up at
 			String message = responseData.responseMessage;
@@ -320,33 +320,24 @@ public class FTPClientManager implements ProtocolManager {
 	}
 	
 
-	@Override
-	public void Transition(Object data) throws Throwable {
-		try {
-			switch (this.currentState) {
-			case BEGIN:
-				String commandString = (String)data;
-				// We are being passed a command string
-				this.currentState = FTPState.WAIT;
-				
-				
-				// Parse and act on the command that will bring us to waiting state
-				parseAndExecuteCommand(commandString);
-				
-				break;
-				
-			case WAIT:
-				// Change state based on the current state diagram
-				this.currentState = this.currentDiagram.get(this.currentDiagramState);
-				break;
-				
-			default:
-				throw new ProtocolException("Transition() called with invalid state.");
-				
-				
-			}
-		} catch (ClassCastException e) {
-			throw new ProtocolException("The state machine was passed the wrong kind of data");
+	private void transition(FTPState expected) throws Throwable {
+		if (this.currentState != expected) {
+			throw new ProtocolException("State machine expected " + expected.name() + ", got " + this.currentState.name());
+		}
+		switch (this.currentState) {
+		case BEGIN:
+			this.currentState = FTPState.WAIT;
+			break;
+			
+		case WAIT:
+			// Change state based on the current state diagram
+			this.currentState = this.currentDiagram.get(this.currentDiagramState);
+			break;
+			
+		default:
+			throw new ProtocolException("Transition() called with invalid state.");
+			
+			
 		}
 		
 	}
@@ -356,11 +347,9 @@ public class FTPClientManager implements ProtocolManager {
 	// exceptions that occur.
 	private void waitForReady() throws Throwable {
 		while(!IsReady()) {
-			System.out.println("Locking!");
 			CheckException();
 			Thread.sleep(100);
 		}
-		System.out.println("Unlocked!");
 	}
 	
 	
@@ -375,7 +364,11 @@ public class FTPClientManager implements ProtocolManager {
 	
 	/* Sending commands */
 	
-	private void parseAndExecuteCommand(String command) throws Throwable {
+	public void ParseAndExecuteInterfaceCommand(String command) throws Throwable {
+		if (this.currentState != FTPState.BEGIN) {
+			throw new ProtocolException("State machine not in BEGIN when sending command");
+		}
+		
 		String[] tokens = command.split(" ");
 		if (tokens.length < 1) {
 			throw new Exception("Command parsing got 0 tokens...what?");
@@ -412,6 +405,9 @@ public class FTPClientManager implements ProtocolManager {
 		
 		// Set the diagram state's command field
 		this.currentDiagramState.cmd = cmd;
+		
+		// We should be in BEGIN, go to WAIT
+		transition(FTPState.BEGIN);
 		
 		// Invoke the handler with the arguments
 		FTPCmdMap.get(cmd).handle(args);
@@ -450,6 +446,7 @@ public class FTPClientManager implements ProtocolManager {
 			readyForCommand = false;
 			currentDiagram = stateDiagrams.get(FTPCommand.NOOP);
 			currentDiagramState.cmd = FTPCommand.NOOP;
+			transition(FTPState.BEGIN);
 			sendControlMessage("");
 			waitForReady();
 		}
