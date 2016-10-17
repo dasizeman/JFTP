@@ -95,16 +95,18 @@ public class FTPControlConnection extends Connection implements Runnable {
 			// Look for the code followed by a '-', this means the response is multiline
 			String firstLine = response.toString();
 			
-			if (!Pattern.matches(firstLine, "^\\d+-")) {
+			if (!Pattern.matches("^\\d+-.*", firstLine)) {
 				return firstLine;
 			}
+			
+			response.append(CRLF);
 			
 			// Read until we find the next line beginning with a number
 			String thisLine;
 			do {
 				thisLine = this.reader.readLine();
-				response.append(thisLine);
-			}while(!Pattern.matches(thisLine, "^\\d+"));
+				response.append(thisLine + CRLF);
+			}while(!Pattern.matches("^\\d+.*", thisLine));
 			
 			
 		} catch (IOException e) {

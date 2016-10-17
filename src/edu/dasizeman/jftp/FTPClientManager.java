@@ -281,7 +281,7 @@ public class FTPClientManager implements ProtocolManager {
 		// Set the current diagram state's response
 		
 		// First let's separate the code and the message by using our old friend Mr. Reginald Xavior
-		Pattern responsePattern = Pattern.compile("^(\\d+)(.*)");
+		Pattern responsePattern = Pattern.compile("^(\\d+)(.*)", Pattern.DOTALL);
 		Matcher responseMatcher = responsePattern.matcher(responseStr);
 		
 		if (!responseMatcher.find() || responseMatcher.groupCount() < 1) {
