@@ -11,11 +11,13 @@ public class Connection {
 	protected String host;
 	protected int port;
 	
+	// Only used by subclass
+	public Connection() {}
+	
 	public Connection(String host) throws Exception {
 		if (!parseHostString(host)) {
 			throw new Exception("Could not parse connection host: " + host);
 		}
-		Connect();
 	}
 	
 	protected void Connect() throws Exception {

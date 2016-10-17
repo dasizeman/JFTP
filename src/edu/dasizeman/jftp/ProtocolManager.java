@@ -10,6 +10,8 @@ public interface ProtocolManager {
 	
 	public void DataReceived(byte[] data);
 	
+	public void TextDataReceived(String data);
+	
 	public boolean IsReady();
 	
 	public void CheckException() throws Throwable;

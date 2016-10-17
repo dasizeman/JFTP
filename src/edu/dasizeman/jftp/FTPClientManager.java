@@ -237,6 +237,12 @@ public class FTPClientManager implements ProtocolManager {
 	}
 
 	@Override
+	public void TextDataReceived(String data) {
+		logger.log(Level.INFO, data);
+		
+	}
+
+	@Override
 	public void ControlDataReceived(String data) {
 		FTPResponseData responseData;
 		try {
@@ -390,7 +396,7 @@ public class FTPClientManager implements ProtocolManager {
 	}
 
 	private void sendControlMessage(String message) throws Exception {
-		FTPControlConnection connection = FTPControlConnection.getInstance(this.currentControlHost);
+		FTPConnection connection = FTPConnection.getControlInstance(this.currentControlHost);
 		connection.SetProtocolManager(this);
 		connection.SetExceptionHandler(this.exHandler);
 		connection.SendCommand(message);
@@ -478,9 +484,15 @@ public class FTPClientManager implements ProtocolManager {
 	public class CD_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "CD_CMD");
+		public void handle(String[] command) throws Throwable {
+			if (command.length < 1) {
+				badCommand();
+				return;
+			}
+			
+			// Send a CWD FTP command
+			doProtocolCommand(FTPCommand.CWD, command);
+			
 			
 		}
 		
@@ -488,9 +500,10 @@ public class FTPClientManager implements ProtocolManager {
 	public class CDUP_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "CDUP_CMD");
+		public void handle(String[] command) throws Throwable {
+			
+			// Send a CDUP FTP command
+			doProtocolCommand(FTPCommand.CDUP, command);
 			
 		}
 		
@@ -547,10 +560,10 @@ public class FTPClientManager implements ProtocolManager {
 	public class LS_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "LS_CMD");
+		public void handle(String[] command) throws Throwable {
 			
+			// Send a LIST FTP command
+			doProtocolCommand(FTPCommand.LIST, command);
 		}
 		
 	}
@@ -621,8 +634,8 @@ public class FTPClientManager implements ProtocolManager {
 	public class CWDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+		public void handle(String[] command) throws Throwable {
+			sendControlMessage(FTPCommand.CWD.name() + " " + command[0]);
 			
 		}
 		
@@ -630,8 +643,8 @@ public class FTPClientManager implements ProtocolManager {
 	public class CDUPhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+		public void handle(String[] command) throws Throwable {
+			sendControlMessage(FTPCommand.CDUP.name());
 			
 		}
 		
@@ -702,8 +715,12 @@ public class FTPClientManager implements ProtocolManager {
 	public class LISThandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+		public void handle(String[] command) throws Throwable {
+			String commandStr = FTPCommand.LIST.name();
+			if (command.length > 0) {
+				commandStr += " " + String.join(" ", command);
+			}
+			sendControlMessage(commandStr);
 			
 		}
 		
@@ -720,6 +737,7 @@ public class FTPClientManager implements ProtocolManager {
 		}
 		
 	}
+
 
 }
 
