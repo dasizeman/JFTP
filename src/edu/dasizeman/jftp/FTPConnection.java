@@ -50,7 +50,6 @@ public class FTPConnection extends Connection implements Runnable {
 		if (controlInstance == null) {
 			controlInstance = new FTPConnection(host);
 			controlInstance.mode = Mode.CONTROL;
-			controlInstance.MODULE_NAME = "ControlConnection";
 		}
 		
 		// If the host address or port have changed, we must re-connect
@@ -78,7 +77,6 @@ public class FTPConnection extends Connection implements Runnable {
 		if(dataInstance == null) {
 			dataInstance = new FTPConnection(host, type);
 			dataInstance.mode = Mode.DATA;
-			dataInstance.MODULE_NAME = "DataConnection";
 		}
 		
 		switch (type) {
@@ -124,6 +122,7 @@ public class FTPConnection extends Connection implements Runnable {
 		Connect();
 		this.writer = new BufferedWriter(new OutputStreamWriter(this.socket.getOutputStream()));
 		this.reader = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
+		this.MODULE_NAME = "ControlConnection";
 		logger.log(Level.INFO, MODULE_NAME + ":connecting to " + host);
 		
 		// TODO Figure out our host strings for active
@@ -132,6 +131,7 @@ public class FTPConnection extends Connection implements Runnable {
 	// Used for data connections
 	public FTPConnection(String host, FTPCommand type) throws Exception {
 		this.filePath = "";
+		this.MODULE_NAME = "DataConnection";
 		if (type == FTPCommand.PASV || type == FTPCommand.EPSV) {
 			// Copied from other constructor because I don't have time
 			if (!parseHostString(host)) {
@@ -200,9 +200,13 @@ public class FTPConnection extends Connection implements Runnable {
 		StringBuffer data = new StringBuffer();
 		
 		// Read until the connection is closed on us
+		String line;
 		while(true) {
 			try {
-				data.append(this.reader.readLine());
+				line = this.reader.readLine();
+				if (line == null)
+					break;
+				data.append(line + CRLF);
 			} catch (IOException e) {
 				break;
 			}

@@ -124,10 +124,7 @@ public class FTPClientManager implements ProtocolManager {
 		// Use a dirty reflection trick to build our handler maps
 		FTPCmdMap = new HashMap<FTPCommand, FTPClientCommandHandler>();
 		FTPInterfaceCmdMap = new HashMap<FTPInterfaceCommand, FTPClientCommandHandler>();
-		// TODO do this
 		
-		
-		// TODO initiate a connection that can call back here
 	}
 	
 	public static FTPClientManager getInstance() {
@@ -146,7 +143,9 @@ public class FTPClientManager implements ProtocolManager {
 	private FTPExceptionHandler exHandler;
 	private Throwable unhandledException;
 	private String currentControlHost, currentDataHost;
-	private boolean readyForCommand;
+	private boolean controlFinished, dataFinished;
+	private FTPCommand dataMode;
+	private FTPClientManager selfPtr;
 
 	
 	
@@ -157,7 +156,10 @@ public class FTPClientManager implements ProtocolManager {
 		this.unhandledException = null;
 		this.exHandler = new FTPExceptionHandler();
 		this.exHandler.setFTPManager(this);
-		this.readyForCommand = true;
+		this.controlFinished = true;
+		this.dataFinished = true;
+		this.dataMode = FTPCommand.PASV;
+		this.selfPtr = this;
 		
 		
 		// Interface commands
@@ -238,7 +240,10 @@ public class FTPClientManager implements ProtocolManager {
 
 	@Override
 	public void TextDataReceived(String data) {
-		logger.log(Level.INFO, data);
+		for (String line : data.split("\r\n")) {
+			logger.log(Level.INFO, line);
+		}
+		this.dataFinished = true;
 		
 	}
 
@@ -270,10 +275,13 @@ public class FTPClientManager implements ProtocolManager {
 				// Ruh roh.  Let's throw our exception so it will be picked up by the shell. 
 				// This will also cause the state machine to be reset 
 				throw new ProtocolException(message);
+			} else if (this.currentState == FTPState.WAIT) {
+				// If we ended up in WAIT again, receive the command we are waiting for
+				doControlReceive();
 			}
 			
 			// State is now set from this response, we can unlock
-			this.readyForCommand = true;
+			this.controlFinished = true;
 			
 		} catch (Throwable e) {
 			e.printStackTrace();
@@ -314,15 +322,44 @@ public class FTPClientManager implements ProtocolManager {
 		
 		// TODO this is where we check if this response has any side effects (like setting our data connection for PASV),
 		// and do them
+		if (response == FTPResponse.ENTERING_PASV) {
+			this.currentDataHost = parsePASVResponse(responseMessage);
+			this.dataMode = FTPCommand.PASV;
+		}
 		
 		
 		return new FTPResponseData(response, responseMessage);
 	}
 	
+	private String parsePASVResponse(String response) throws ProtocolException {
+		Pattern pasvPattern = Pattern.compile("\\((\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\)");
+		Matcher pasvMatcher = pasvPattern.matcher(response);
+		if (!pasvMatcher.find() || pasvMatcher.groupCount() < 6) {
+			throw new ProtocolException("Could not parse PASV reponse");
+		}
+		
+		StringBuffer hostStr = new StringBuffer();
+		// Build IPv4 segment
+		for (int i = 1; i <= 4; i++) {
+			hostStr.append(pasvMatcher.group(i));
+			if (i == 4) {
+				hostStr.append(":");
+			} else {
+				hostStr.append(".");
+			}
+		}
+		
+		// Build port string
+		String portString = Integer.toString((256 * Integer.parseInt(pasvMatcher.group(5)) + Integer.parseInt(pasvMatcher.group(6))));
+		hostStr.append(portString);
+		
+		return hostStr.toString();
+	}
+	
 	/* State machine */
 
 	public boolean IsReady() {
-		return this.readyForCommand;
+		return this.controlFinished && this.dataFinished;
 	}
 	
 
@@ -363,7 +400,8 @@ public class FTPClientManager implements ProtocolManager {
 	public void Reset() {
 		this.currentState = FTPState.BEGIN;
 		this.currentDiagramState = new FTPDiagramState();
-		this.readyForCommand = true;
+		this.controlFinished = true;
+		this.dataFinished = true;
 		this.unhandledException = null;
 	}
 	
@@ -402,10 +440,21 @@ public class FTPClientManager implements ProtocolManager {
 		connection.SendCommand(message);
 	}
 	
+	private void receiveData(String file) throws Exception {
+		if (file == null)
+			file = "";
+		// Set up a data connection
+		FTPConnection dataConnection = FTPConnection.getDataInstance(currentDataHost, dataMode);
+		dataConnection.SetProtocolManager(this);
+		dataConnection.SetExceptionHandler(this.exHandler);
+		dataConnection.ReadData(file);
+		
+	}
+	
 	// Wrapper that calls the correct handler for an FTP Protocol command and sets state diagram info appropriately
 	private void doProtocolCommand(FTPCommand cmd, String[] args) throws Throwable {
 		// "Lock" the state machine thread until we've received a response and set state, or failed.
-		this.readyForCommand= false;
+		this.controlFinished= false;
 
 		// Set the current state diagram
 		this.currentDiagram = stateDiagrams.get(cmd);
@@ -420,6 +469,18 @@ public class FTPClientManager implements ProtocolManager {
 		FTPCmdMap.get(cmd).handle(args);
 		
 		// Wait for the state machine to be ready 
+		waitForReady();
+	}
+	
+	// Special case here, we will "send" a blank message to initiate the connection
+	// and read the greeting. We'll make it look like a NOOP command to the state machine, 
+	// so that everything works.  A little hacky.
+	// For intermediate reposnes, and the greeting
+	private void doControlReceive() throws Throwable {
+		controlFinished = false;
+		currentDiagram = stateDiagrams.get(FTPCommand.NOOP);
+		currentDiagramState.cmd = FTPCommand.NOOP;
+		sendControlMessage("");
 		waitForReady();
 	}
 	
@@ -447,15 +508,8 @@ public class FTPClientManager implements ProtocolManager {
 			}
 			currentControlHost = command[0];
 			
-			// Special case here, we will "send" a blank message to initiate the connection
-			// and read the greeting. We'll make it look like a NOOP command to the state machine, 
-			// so that everything works.  A little hacky.
-			readyForCommand = false;
-			currentDiagram = stateDiagrams.get(FTPCommand.NOOP);
-			currentDiagramState.cmd = FTPCommand.NOOP;
 			transition(FTPState.BEGIN);
-			sendControlMessage("");
-			waitForReady();
+			doControlReceive();
 		}
 		
 	}
@@ -521,10 +575,14 @@ public class FTPClientManager implements ProtocolManager {
 	public class PASV_CMDhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
-			logger.log(Level.SEVERE, "PASV_CMD");
-			
+		public void handle(String[] command) throws Throwable {
+			if (command.length > 1 && command[1].equals("-e")) {
+				// EPSV
+				doProtocolCommand(FTPCommand.EPSV, command);
+			}else {
+				// PASV
+				doProtocolCommand(FTPCommand.PASV, command);
+			}
 		}
 		
 	}
@@ -661,8 +719,8 @@ public class FTPClientManager implements ProtocolManager {
 	public class PASVhandler implements FTPClientCommandHandler {
 
 		@Override
-		public void handle(String[] command) {
-			// TODO Auto-generated method stub
+		public void handle(String[] command) throws Throwable {
+			sendControlMessage(FTPCommand.PASV.name());
 			
 		}
 		
@@ -720,6 +778,11 @@ public class FTPClientManager implements ProtocolManager {
 			if (command.length > 0) {
 				commandStr += " " + String.join(" ", command);
 			}
+			
+			// Connect to the data port and start receiving.  A blank
+			// argument means text data will be read.
+			dataFinished = false;
+			receiveData("");
 			sendControlMessage(commandStr);
 			
 		}
